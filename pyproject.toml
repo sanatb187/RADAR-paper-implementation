@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "radar-bench"
+version = "0.1.0"
+description = "An installable library for reproducing the RADAR routing benchmark"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/radar_bench"]
+
+[dependency-groups]
+dev = [
+    "mypy",
+    "pre-commit",
+    "pytest",
+    "pytest-cov",
+    "ruff",
+]
