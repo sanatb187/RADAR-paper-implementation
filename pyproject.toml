@@ -20,4 +20,5 @@ dev = [
     "pytest",
     "pytest-cov",
     "ruff",
+    "pydantic"
 ]
