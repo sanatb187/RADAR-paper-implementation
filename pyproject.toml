@@ -8,7 +8,9 @@ version = "0.1.0"
 description = "An installable library for reproducing the RADAR routing benchmark"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "numpy>=2.5.2",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/radar_bench"]
