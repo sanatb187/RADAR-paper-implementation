@@ -1,6 +1,6 @@
+import numpy as np
 import pytest
 import torch
-import numpy as np
 
 from radar_bench.irt import TwoPLIRT, train_irt_model
 from radar_bench.response_matrix import ResponseMatrix
@@ -41,15 +41,9 @@ def test_known_irt_calculation() -> None:
     )
 
     with torch.no_grad():
-        model.abilities.copy_(
-            torch.tensor([1.0, 2.0])
-        )
-        model.discrimination_weights.copy_(
-            torch.tensor([1.0, 0.0])
-        )
-        model.difficulty_weights.copy_(
-            torch.tensor([0.0, 1.0])
-        )
+        model.abilities.copy_(torch.tensor([1.0, 2.0]))
+        model.discrimination_weights.copy_(torch.tensor([1.0, 0.0]))
+        model.difficulty_weights.copy_(torch.tensor([0.0, 1.0]))
 
     query_embeddings = torch.tensor(
         [
@@ -100,6 +94,7 @@ def test_all_parameters_receive_gradients() -> None:
     assert torch.any(model.discrimination_weights.grad != 0)
     assert torch.any(model.difficulty_weights.grad != 0)
 
+
 def test_rejects_wrong_embedding_dimension() -> None:
     model = TwoPLIRT(
         num_configurations=2,
@@ -148,6 +143,8 @@ def test_rejects_invalid_model_dimensions(
             num_configurations=num_configurations,
             embedding_dimension=embedding_dimension,
         )
+
+
 def test_training_reduces_loss() -> None:
     torch.manual_seed(42)
 
@@ -216,9 +213,7 @@ def test_trained_model_predicts_complete_matrix() -> None:
     model.eval()
 
     with torch.no_grad():
-        probabilities = model.predict_probabilities(
-            query_embeddings
-        )
+        probabilities = model.predict_probabilities(query_embeddings)
 
     assert probabilities.shape == response_matrix.values.shape
     assert torch.all(probabilities >= 0)

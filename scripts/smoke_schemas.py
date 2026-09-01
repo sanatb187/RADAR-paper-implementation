@@ -39,7 +39,7 @@ usage = TokenUsage(
 )
 
 print(usage.output_tokens)  # 520
-print(usage.total_tokens)   # 620
+print(usage.total_tokens)  # 620
 
 generation = GenerationResult(
     generation_id="gpqa-001__qwen3-4b__512__run-0",

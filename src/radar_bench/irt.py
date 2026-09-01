@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+
 from radar_bench.response_matrix import ResponseMatrix
 
 
@@ -23,19 +24,13 @@ class TwoPLIRT(nn.Module):
         self.embedding_dimension = embedding_dimension
 
         # theta_i: ability of each model configuration
-        self.abilities = nn.Parameter(
-            torch.empty(num_configurations)
-        )
+        self.abilities = nn.Parameter(torch.empty(num_configurations))
 
         # w_a: converts a query embedding into discrimination a_j
-        self.discrimination_weights = nn.Parameter(
-            torch.empty(embedding_dimension)
-        )
+        self.discrimination_weights = nn.Parameter(torch.empty(embedding_dimension))
 
         # w_b: converts a query embedding into difficulty b_j
-        self.difficulty_weights = nn.Parameter(
-            torch.empty(embedding_dimension)
-        )
+        self.difficulty_weights = nn.Parameter(torch.empty(embedding_dimension))
 
         nn.init.normal_(self.abilities, mean=0.0, std=0.1)
         nn.init.normal_(
@@ -78,14 +73,11 @@ class TwoPLIRT(nn.Module):
                 f"{query_embeddings.shape[1]}"
             )
 
-        discrimination = (
-            query_embeddings @ self.discrimination_weights
-        )
+        discrimination = query_embeddings @ self.discrimination_weights
         difficulty = query_embeddings @ self.difficulty_weights
 
         logits = discrimination.unsqueeze(0) * (
-            self.abilities.unsqueeze(1)
-            - difficulty.unsqueeze(0)
+            self.abilities.unsqueeze(1) - difficulty.unsqueeze(0)
         )
 
         return logits
