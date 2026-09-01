@@ -1,7 +1,9 @@
 import pytest
 import torch
+import numpy as np
 
-from radar_bench.irt import TwoPLIRT
+from radar_bench.irt import TwoPLIRT, train_irt_model
+from radar_bench.response_matrix import ResponseMatrix
 
 
 def test_output_shape() -> None:
@@ -82,6 +84,7 @@ def test_all_parameters_receive_gradients() -> None:
     ).float()
 
     logits = model(query_embeddings)
+
     loss = torch.nn.functional.binary_cross_entropy_with_logits(
         logits,
         targets,
@@ -93,6 +96,9 @@ def test_all_parameters_receive_gradients() -> None:
     assert model.discrimination_weights.grad is not None
     assert model.difficulty_weights.grad is not None
 
+    assert torch.any(model.abilities.grad != 0)
+    assert torch.any(model.discrimination_weights.grad != 0)
+    assert torch.any(model.difficulty_weights.grad != 0)
 
 def test_rejects_wrong_embedding_dimension() -> None:
     model = TwoPLIRT(
@@ -141,4 +147,104 @@ def test_rejects_invalid_model_dimensions(
         TwoPLIRT(
             num_configurations=num_configurations,
             embedding_dimension=embedding_dimension,
+        )
+def test_training_reduces_loss() -> None:
+    torch.manual_seed(42)
+
+    response_matrix = ResponseMatrix(
+        values=np.array(
+            [
+                [1, 0, 1, 0],
+                [1, 1, 1, 0],
+            ],
+            dtype=np.int8,
+        ),
+        configuration_ids=("config-a", "config-b"),
+        query_ids=("query-1", "query-2", "query-3", "query-4"),
+    )
+
+    query_embeddings = torch.tensor(
+        [
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [1.0, 1.0],
+            [-1.0, 1.0],
+        ]
+    )
+
+    _, loss_history = train_irt_model(
+        response_matrix=response_matrix,
+        query_embeddings=query_embeddings,
+        num_epochs=300,
+        learning_rate=0.05,
+    )
+
+    assert len(loss_history) == 300
+    assert loss_history[-1] < loss_history[0]
+
+
+def test_trained_model_predicts_complete_matrix() -> None:
+    torch.manual_seed(42)
+
+    response_matrix = ResponseMatrix(
+        values=np.array(
+            [
+                [1, 0, 1],
+                [0, 1, 1],
+            ],
+            dtype=np.int8,
+        ),
+        configuration_ids=("config-a", "config-b"),
+        query_ids=("query-1", "query-2", "query-3"),
+    )
+
+    query_embeddings = torch.tensor(
+        [
+            [1.0, 0.0],
+            [0.0, 1.0],
+            [1.0, 1.0],
+        ]
+    )
+
+    model, _ = train_irt_model(
+        response_matrix=response_matrix,
+        query_embeddings=query_embeddings,
+        num_epochs=100,
+        learning_rate=0.05,
+    )
+
+    model.eval()
+
+    with torch.no_grad():
+        probabilities = model.predict_probabilities(
+            query_embeddings
+        )
+
+    assert probabilities.shape == response_matrix.values.shape
+    assert torch.all(probabilities >= 0)
+    assert torch.all(probabilities <= 1)
+
+
+def test_training_rejects_query_count_mismatch() -> None:
+    response_matrix = ResponseMatrix(
+        values=np.array(
+            [
+                [1, 0, 1],
+                [0, 1, 1],
+            ],
+            dtype=np.int8,
+        ),
+        configuration_ids=("config-a", "config-b"),
+        query_ids=("query-1", "query-2", "query-3"),
+    )
+
+    query_embeddings = torch.randn(2, 4)
+
+    with pytest.raises(
+        ValueError,
+        match="number of query embeddings",
+    ):
+        train_irt_model(
+            response_matrix=response_matrix,
+            query_embeddings=query_embeddings,
         )
