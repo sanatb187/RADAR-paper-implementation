@@ -1,6 +1,6 @@
 from collections.abc import Callable, Mapping
 from time import perf_counter
-from typing import Any
+from typing import Any, Literal
 
 from ollama import chat
 
@@ -12,6 +12,7 @@ from radar_bench.schemas import (
     GenerationResult,
     ModelConfiguration,
     Query,
+    RADARSchema,
     TokenBudget,
     TokenUsage,
 )
@@ -19,6 +20,10 @@ from radar_bench.schemas import (
 OllamaChatFunction = Callable[..., Any]
 
 FINAL_ANSWER_MAX_TOKENS = 256
+
+
+class OllamaMultipleChoiceAnswer(RADARSchema):
+    answer: Literal["A", "B", "C", "D"]
 
 
 def _get_field(
@@ -42,6 +47,19 @@ def _get_message_text(
         raise ValueError("Ollama response contains no message")
 
     return str(_get_field(message, field, "") or "")
+
+
+def _get_structured_answer(response: Any) -> str:
+    response_text = _get_message_text(
+        response,
+        "content",
+    )
+
+    answer = OllamaMultipleChoiceAnswer.model_validate_json(
+        response_text,
+    )
+
+    return rf"\boxed{{{answer.answer}}}"
 
 
 def _get_token_count(
@@ -92,10 +110,12 @@ def run_ollama_generation(
     model_name = _ollama_model_name(configuration)
     prompt = format_multiple_choice_prompt(query)
     question = format_multiple_choice_question(query)
+    reasoning_prompt = f"{prompt}\n/think"
 
     answer_instruction = (
-        "Do not explain your answer. Return exactly one of "
-        r"\boxed{A}, \boxed{B}, \boxed{C}, or \boxed{D}."
+        "Return a JSON object containing only the field "
+        '"answer". Its value must be one of "A", "B", "C", or "D".'
+        "\n/no_think"
     )
 
     start_time = perf_counter()
@@ -111,13 +131,14 @@ def run_ollama_generation(
             ],
             think=False,
             stream=False,
+            format=OllamaMultipleChoiceAnswer.model_json_schema(),
             options={
                 **additional_options,
                 "num_predict": final_answer_max_tokens,
             },
         )
 
-        response_text = _get_message_text(response, "content")
+        response_text = _get_structured_answer(response)
         reasoning_text = None
 
         prompt_tokens = _get_token_count(
@@ -136,7 +157,7 @@ def run_ollama_generation(
             messages=[
                 {
                     "role": "user",
-                    "content": prompt,
+                    "content": reasoning_prompt,
                 }
             ],
             think=True,
@@ -169,15 +190,15 @@ def run_ollama_generation(
             ],
             think=False,
             stream=False,
+            format=OllamaMultipleChoiceAnswer.model_json_schema(),
             options={
                 **additional_options,
                 "num_predict": final_answer_max_tokens,
             },
         )
 
-        response_text = _get_message_text(
+        response_text = _get_structured_answer(
             answer_response,
-            "content",
         )
 
         prompt_tokens = _get_token_count(
