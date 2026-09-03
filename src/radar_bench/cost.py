@@ -110,3 +110,51 @@ def normalize_costs(
         configuration_id: (cost - minimum_cost) / cost_range
         for configuration_id, cost in costs_by_configuration.items()
     }
+
+
+def estimate_configuration_latency_costs(
+    evaluation_records: Sequence[EvaluationRecord],
+    configuration_ids: Sequence[str],
+) -> dict[str, float]:
+    """Calculate average observed latency for each configuration."""
+
+    if not evaluation_records:
+        raise ValueError("evaluation_records cannot be empty")
+
+    if not configuration_ids:
+        raise ValueError("configuration_ids cannot be empty")
+
+    if len(set(configuration_ids)) != len(configuration_ids):
+        raise ValueError("configuration_ids must be unique")
+
+    expected_configuration_ids = set(configuration_ids)
+    total_latencies: dict[str, float] = defaultdict(float)
+    record_counts: dict[str, int] = defaultdict(int)
+
+    for record in evaluation_records:
+        configuration_id = record.generation.configuration_id
+
+        if configuration_id not in (expected_configuration_ids):
+            raise ValueError(f"Unknown configuration ID: {configuration_id}")
+
+        total_latencies[configuration_id] += record.generation.latency_seconds
+        record_counts[configuration_id] += 1
+
+    missing_configuration_ids = [
+        configuration_id
+        for configuration_id in configuration_ids
+        if record_counts[configuration_id] == 0
+    ]
+
+    if missing_configuration_ids:
+        raise ValueError(
+            "No evaluation records found for configurations: "
+            + ", ".join(missing_configuration_ids)
+        )
+
+    return {
+        configuration_id: (
+            total_latencies[configuration_id] / record_counts[configuration_id]
+        )
+        for configuration_id in configuration_ids
+    }
