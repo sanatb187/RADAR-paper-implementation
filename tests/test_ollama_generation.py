@@ -71,8 +71,13 @@ def test_zero_budget_uses_one_request() -> None:
     assert call["options"] == {
         "temperature": 0.0,
         "seed": 42,
-        "num_predict": 64,
+        "num_predict": 256,
     }
+
+    answer_prompt = call["messages"][0]["content"]
+
+    assert "Please reason step by step" not in answer_prompt
+    assert "Do not explain your answer" in answer_prompt
 
     assert generation.response_text == r"\boxed{B}"
     assert generation.reasoning_text is None
@@ -126,9 +131,12 @@ def test_positive_budget_uses_two_requests() -> None:
     assert reasoning_call["options"]["num_predict"] == 256
 
     assert answer_call["think"] is False
-    assert answer_call["options"]["num_predict"] == 64
+    assert answer_call["options"]["num_predict"] == 256
 
     final_prompt = answer_call["messages"][0]["content"]
+
+    assert "Please reason step by step" not in final_prompt
+    assert "Do not explain your answer" in final_prompt
 
     assert "The second option is correct." in final_prompt
     assert r"\boxed{A}" in final_prompt
