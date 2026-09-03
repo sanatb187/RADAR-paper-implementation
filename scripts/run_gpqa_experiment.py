@@ -9,7 +9,7 @@ from radar_bench.configurations import (
 )
 from radar_bench.datasets.gpqa import (
     GPQA_REVISION,
-    load_gpqa_splits,
+    load_gpqa_diamond_splits,
 )
 from radar_bench.experiment import (
     run_gpqa_experiment,
@@ -130,7 +130,7 @@ def main() -> None:
         arguments.budgets,
     )
 
-    splits = load_gpqa_splits(
+    splits = load_gpqa_diamond_splits(
         seed=arguments.seed,
         revision=arguments.revision,
     )
@@ -147,7 +147,7 @@ def main() -> None:
     )
 
     experiment_directory = arguments.output_dir / (
-        f"revision-{arguments.revision[:12]}_seed-{arguments.seed}"
+        f"diamond-split_revision-{arguments.revision[:12]}_seed-{arguments.seed}"
     )
 
     train_output = experiment_directory / f"train_n-{arguments.train_count}.jsonl"

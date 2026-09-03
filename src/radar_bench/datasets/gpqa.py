@@ -11,6 +11,7 @@ GPQA_DATASET_ID = "Idavidrein/gpqa"
 GPQA_DIAMOND_CONFIG = "gpqa_diamond"
 GPQA_MAIN_CONFIG = "gpqa_main"
 GPQA_REVISION = "633f5ee89ab8ad4522a9f850766b73f62147ffdd"
+GPQA_DIAMOND_TRAIN_FRACTION = 0.8
 GPQASplit = Literal["train", "test"]
 
 REQUIRED_FIELDS = {
@@ -97,6 +98,76 @@ def load_gpqa_diamond(
     )
 
     return [convert_gpqa_row(row, seed=seed, split="test") for row in dataset]
+
+
+def load_gpqa_diamond_splits(
+    *,
+    seed: int = 0,
+    revision: str = GPQA_REVISION,
+    train_fraction: float = GPQA_DIAMOND_TRAIN_FRACTION,
+) -> GPQASplits:
+    """Split GPQA-Diamond into deterministic train and test sets."""
+
+    if not 0.0 < train_fraction < 1.0:
+        raise ValueError("train_fraction must be between 0 and 1")
+
+    diamond_rows = list(
+        load_dataset(
+            GPQA_DATASET_ID,
+            GPQA_DIAMOND_CONFIG,
+            split="train",
+            revision=revision,
+        )
+    )
+
+    if len(diamond_rows) < 2:
+        raise ValueError("GPQA-Diamond must contain at least two records")
+
+    record_ids = [str(row["Record ID"]) for row in diamond_rows]
+
+    if len(record_ids) != len(set(record_ids)):
+        raise ValueError("GPQA-Diamond contains duplicate record IDs")
+
+    # Sorting makes the split stable even if dataset iteration order changes.
+    shuffled_rows = sorted(
+        diamond_rows,
+        key=lambda row: str(row["Record ID"]),
+    )
+
+    random_generator = random.Random(seed)
+    random_generator.shuffle(shuffled_rows)
+
+    train_size = int(len(shuffled_rows) * train_fraction)
+    train_size = max(
+        1,
+        min(train_size, len(shuffled_rows) - 1),
+    )
+
+    train_rows = shuffled_rows[:train_size]
+    test_rows = shuffled_rows[train_size:]
+
+    train_queries = tuple(
+        convert_gpqa_row(
+            row,
+            seed=seed,
+            split="train",
+        )
+        for row in train_rows
+    )
+
+    test_queries = tuple(
+        convert_gpqa_row(
+            row,
+            seed=seed,
+            split="test",
+        )
+        for row in test_rows
+    )
+
+    return GPQASplits(
+        train=train_queries,
+        test=test_queries,
+    )
 
 
 def load_gpqa_splits(
