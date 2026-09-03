@@ -12,6 +12,7 @@ dependencies = [
     "datasets>=5.0.1",
     "litellm>=1.99.0",
     "numpy>=2.5.2",
+    "ollama>=0.6.2",
     "torch>=2.13.0",
 ]
 
