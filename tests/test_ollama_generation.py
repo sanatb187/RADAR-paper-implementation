@@ -44,7 +44,7 @@ def test_zero_budget_uses_one_request() -> None:
 
         return {
             "message": {
-                "content": r"\boxed{B}",
+                "content": '{"answer":"B"}',
                 "thinking": "",
             },
             "prompt_eval_count": 100,
@@ -65,6 +65,13 @@ def test_zero_budget_uses_one_request() -> None:
 
     call = captured_calls[0]
 
+    assert call["format"]["properties"]["answer"]["enum"] == [
+        "A",
+        "B",
+        "C",
+        "D",
+    ]
+
     assert call["model"] == "qwen3:0.6b"
     assert call["think"] is False
     assert call["stream"] is False
@@ -76,8 +83,9 @@ def test_zero_budget_uses_one_request() -> None:
 
     answer_prompt = call["messages"][0]["content"]
 
+    assert "/no_think" in answer_prompt
     assert "Please reason step by step" not in answer_prompt
-    assert "Do not explain your answer" in answer_prompt
+    assert "Return a JSON object" in answer_prompt
 
     assert generation.response_text == r"\boxed{B}"
     assert generation.reasoning_text is None
@@ -104,7 +112,7 @@ def test_positive_budget_uses_two_requests() -> None:
 
         return {
             "message": {
-                "content": r"\boxed{B}",
+                "content": '{"answer":"B"}',
                 "thinking": "",
             },
             "prompt_eval_count": 380,
@@ -133,13 +141,26 @@ def test_positive_budget_uses_two_requests() -> None:
     assert answer_call["think"] is False
     assert answer_call["options"]["num_predict"] == 256
 
+    assert answer_call["format"]["properties"]["answer"]["enum"] == [
+        "A",
+        "B",
+        "C",
+        "D",
+    ]
+
+    assert "format" not in reasoning_call
+
     final_prompt = answer_call["messages"][0]["content"]
 
+    reasoning_prompt = reasoning_call["messages"][0]["content"]
+
+    assert "/think" in reasoning_prompt
+    assert "/no_think" in final_prompt
     assert "Please reason step by step" not in final_prompt
-    assert "Do not explain your answer" in final_prompt
+    assert "Return a JSON object" in final_prompt
 
     assert "The second option is correct." in final_prompt
-    assert r"\boxed{A}" in final_prompt
+    assert r"\boxed{" not in final_prompt
 
     assert generation.generation_id == ("query-1__qwen3-0.6b__tokens-256__run-2")
     assert generation.response_text == r"\boxed{B}"
