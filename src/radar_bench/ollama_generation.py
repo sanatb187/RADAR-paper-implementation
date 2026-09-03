@@ -6,6 +6,7 @@ from ollama import chat
 
 from radar_bench.evaluators.multiple_choice import (
     format_multiple_choice_prompt,
+    format_multiple_choice_question,
 )
 from radar_bench.schemas import (
     GenerationResult,
@@ -17,7 +18,7 @@ from radar_bench.schemas import (
 
 OllamaChatFunction = Callable[..., Any]
 
-FINAL_ANSWER_MAX_TOKENS = 64
+FINAL_ANSWER_MAX_TOKENS = 256
 
 
 def _get_field(
@@ -90,6 +91,12 @@ def run_ollama_generation(
 
     model_name = _ollama_model_name(configuration)
     prompt = format_multiple_choice_prompt(query)
+    question = format_multiple_choice_question(query)
+
+    answer_instruction = (
+        "Do not explain your answer. Return exactly one of "
+        r"\boxed{A}, \boxed{B}, \boxed{C}, or \boxed{D}."
+    )
 
     start_time = perf_counter()
 
@@ -99,7 +106,7 @@ def run_ollama_generation(
             messages=[
                 {
                     "role": "user",
-                    "content": prompt,
+                    "content": f"{question}\n{answer_instruction}",
                 }
             ],
             think=False,
@@ -146,10 +153,10 @@ def run_ollama_generation(
         )
 
         final_prompt = (
-            f"{prompt}\n\n"
-            "Use the following prior reasoning to answer the question:\n"
+            f"{question}\n\n"
+            "Use the following prior reasoning:\n"
             f"{reasoning_text}\n\n"
-            r"Return only the final option in the form \boxed{A}."
+            f"{answer_instruction}"
         )
 
         answer_response = chat_function(

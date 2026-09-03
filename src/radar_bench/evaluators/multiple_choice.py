@@ -22,8 +22,10 @@ BOXED_ANSWER_PATTERN = re.compile(
 )
 
 
-def format_multiple_choice_prompt(query: Query) -> str:
-    """Format a four-choice question using the RADAR prompt."""
+def format_multiple_choice_question(
+    query: Query,
+) -> str:
+    """Format a question without answer instructions."""
 
     if len(query.choices) != 4:
         raise ValueError("The RADAR multiple-choice prompt requires exactly 4 choices")
@@ -42,6 +44,16 @@ def format_multiple_choice_prompt(query: Query) -> str:
             "Answer the following multiple choice question.",
             query.prompt,
             *option_lines,
+        ]
+    )
+
+
+def format_multiple_choice_prompt(query: Query) -> str:
+    """Format a four-choice question using the RADAR prompt."""
+
+    return "\n".join(
+        [
+            format_multiple_choice_question(query),
             (
                 "Please reason step by step, and put your final "
                 r"answer option within \boxed{}."
