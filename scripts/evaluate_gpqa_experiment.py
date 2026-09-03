@@ -4,7 +4,7 @@ from pathlib import Path
 
 from radar_bench.datasets.gpqa import (
     GPQA_REVISION,
-    load_gpqa_splits,
+    load_gpqa_diamond_splits,
 )
 from radar_bench.experiment import (
     load_evaluation_records,
@@ -92,7 +92,7 @@ def main() -> None:
     train_records = load_evaluation_records(arguments.train_records)
     test_records = load_evaluation_records(arguments.test_records)
 
-    splits = load_gpqa_splits(
+    splits = load_gpqa_diamond_splits(
         seed=arguments.seed,
         revision=arguments.revision,
     )

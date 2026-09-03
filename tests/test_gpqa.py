@@ -160,6 +160,83 @@ def test_load_gpqa_splits(
     assert train_ids.isdisjoint(test_ids)
 
 
+def test_load_gpqa_diamond_splits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    rows = [
+        {
+            **SAMPLE_ROW,
+            "Record ID": f"diamond-{index}",
+            "Question": f"Diamond question {index}?",
+        }
+        for index in range(10)
+    ]
+
+    def fake_load_dataset(
+        dataset_id: str,
+        config_name: str,
+        *,
+        split: str,
+        revision: str | None,
+    ) -> list[dict[str, str]]:
+        assert dataset_id == gpqa.GPQA_DATASET_ID
+        assert config_name == gpqa.GPQA_DIAMOND_CONFIG
+        assert split == "train"
+        assert revision == "test-revision"
+
+        return rows
+
+    monkeypatch.setattr(
+        gpqa,
+        "load_dataset",
+        fake_load_dataset,
+    )
+
+    first = gpqa.load_gpqa_diamond_splits(
+        seed=42,
+        revision="test-revision",
+        train_fraction=0.8,
+    )
+
+    second = gpqa.load_gpqa_diamond_splits(
+        seed=42,
+        revision="test-revision",
+        train_fraction=0.8,
+    )
+
+    assert len(first.train) == 8
+    assert len(first.test) == 2
+
+    assert all(query.split == "train" for query in first.train)
+    assert all(query.split == "test" for query in first.test)
+
+    train_ids = {query.query_id for query in first.train}
+
+    test_ids = {query.query_id for query in first.test}
+
+    assert train_ids.isdisjoint(test_ids)
+
+    assert train_ids | test_ids == {f"gpqa::diamond-{index}" for index in range(10)}
+
+    assert first == second
+
+
+@pytest.mark.parametrize(
+    "train_fraction",
+    [-0.1, 0.0, 1.0, 1.1],
+)
+def test_rejects_invalid_diamond_train_fraction(
+    train_fraction: float,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match="train_fraction must be between 0 and 1",
+    ):
+        gpqa.load_gpqa_diamond_splits(
+            train_fraction=train_fraction,
+        )
+
+
 def test_rejects_diamond_record_missing_from_main(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
