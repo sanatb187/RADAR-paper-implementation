@@ -13,7 +13,9 @@ from radar_bench.radar_evaluation import (
     evaluate_radar_experiment,
 )
 from radar_bench.routing_evaluation import (
+    PairedRoutingComparison,
     RoutingEvaluation,
+    count_configuration_selections,
 )
 from radar_bench.schemas import Query
 
@@ -86,6 +88,50 @@ def print_results(
         )
 
 
+def _format_query_ids(
+    query_ids: tuple[str, ...],
+) -> str:
+    if not query_ids:
+        return "none"
+
+    return ", ".join(query_ids)
+
+
+def print_routing_diagnostics(
+    results: Sequence[RoutingEvaluation],
+    comparisons: Sequence[PairedRoutingComparison],
+) -> None:
+    print()
+    print("Routing diagnostics")
+    print("-" * 70)
+
+    for result, comparison in zip(
+        results,
+        comparisons,
+        strict=True,
+    ):
+        selection_counts = count_configuration_selections(result)
+        selection_summary = ", ".join(
+            f"{configuration_id}={count}"
+            for configuration_id, count in selection_counts.items()
+        )
+
+        print()
+        print(result.strategy)
+        print(f"Compared with: {comparison.baseline_strategy}")
+        print(f"Selections: {selection_summary}")
+        print(
+            f"Improved ({len(comparison.improved_query_ids)}): "
+            f"{_format_query_ids(comparison.improved_query_ids)}"
+        )
+        print(
+            f"Regressed ({len(comparison.regressed_query_ids)}): "
+            f"{_format_query_ids(comparison.regressed_query_ids)}"
+        )
+        print(f"Both correct: {len(comparison.both_correct_query_ids)}")
+        print(f"Both incorrect: {len(comparison.both_incorrect_query_ids)}")
+
+
 def main() -> None:
     arguments = parse_arguments()
 
@@ -127,12 +173,30 @@ def main() -> None:
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
 
     print_results(
-        "Fixed-configuration baselines",
+        "Training fixed-configuration results",
+        report.train_fixed_results,
+    )
+
+    print_results(
+        "Test fixed-configuration baselines",
         report.fixed_results,
     )
+
+    print()
+    print("Oracle upper bounds")
+    print("-" * 70)
+    print(f"Train oracle accuracy: {report.train_oracle_accuracy:.3f}")
+    print(f"Test oracle accuracy: {report.test_oracle_accuracy:.3f}")
+    print(f"Best fixed test baseline: {report.best_fixed_result.strategy}")
+
     print_results(
         "RADAR routing",
         report.radar_results,
+    )
+
+    print_routing_diagnostics(
+        report.radar_results,
+        report.radar_comparisons,
     )
 
 
