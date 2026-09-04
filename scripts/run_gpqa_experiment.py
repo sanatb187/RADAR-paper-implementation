@@ -161,7 +161,6 @@ def main() -> None:
     print(f"Planned generations: {generation_count}")
 
     request_options = {
-        "temperature": 0.0,
         "seed": arguments.seed,
         "num_ctx": arguments.num_ctx,
     }

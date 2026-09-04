@@ -55,7 +55,6 @@ def test_zero_budget_uses_one_request() -> None:
         query=make_query(),
         configuration=make_token_configuration(0),
         request_options={
-            "temperature": 0.0,
             "seed": 42,
         },
         chat_function=fake_chat,
@@ -76,7 +75,9 @@ def test_zero_budget_uses_one_request() -> None:
     assert call["think"] is False
     assert call["stream"] is False
     assert call["options"] == {
-        "temperature": 0.0,
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
         "seed": 42,
         "num_predict": 256,
     }
@@ -124,7 +125,6 @@ def test_positive_budget_uses_two_requests() -> None:
         configuration=make_token_configuration(256),
         run_index=2,
         request_options={
-            "temperature": 0.0,
             "seed": 42,
         },
         chat_function=fake_chat,
@@ -140,6 +140,22 @@ def test_positive_budget_uses_two_requests() -> None:
 
     assert answer_call["think"] is False
     assert answer_call["options"]["num_predict"] == 256
+
+    assert reasoning_call["options"] == {
+        "temperature": 0.6,
+        "top_p": 0.95,
+        "top_k": 20,
+        "seed": 42,
+        "num_predict": 256,
+    }
+
+    assert answer_call["options"] == {
+        "temperature": 0.7,
+        "top_p": 0.8,
+        "top_k": 20,
+        "seed": 42,
+        "num_predict": 256,
+    }
 
     assert answer_call["format"]["properties"]["answer"]["enum"] == [
         "A",
