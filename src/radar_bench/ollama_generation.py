@@ -19,6 +19,18 @@ from radar_bench.schemas import (
 
 OllamaChatFunction = Callable[..., Any]
 
+QWEN_THINKING_OPTIONS: dict[str, float | int] = {
+    "temperature": 0.6,
+    "top_p": 0.95,
+    "top_k": 20,
+}
+
+QWEN_ANSWER_OPTIONS: dict[str, float | int] = {
+    "temperature": 0.7,
+    "top_p": 0.8,
+    "top_k": 20,
+}
+
 FINAL_ANSWER_MAX_TOKENS = 256
 
 
@@ -106,6 +118,15 @@ def run_ollama_generation(
         raise ValueError(
             "request_options cannot override the controlled num_predict field"
         )
+    reasoning_options = {
+        **QWEN_THINKING_OPTIONS,
+        **additional_options,
+    }
+
+    answer_options = {
+        **QWEN_ANSWER_OPTIONS,
+        **additional_options,
+    }
 
     model_name = _ollama_model_name(configuration)
     prompt = format_multiple_choice_prompt(query)
@@ -133,7 +154,7 @@ def run_ollama_generation(
             stream=False,
             format=OllamaMultipleChoiceAnswer.model_json_schema(),
             options={
-                **additional_options,
+                **answer_options,
                 "num_predict": final_answer_max_tokens,
             },
         )
@@ -163,7 +184,7 @@ def run_ollama_generation(
             think=True,
             stream=False,
             options={
-                **additional_options,
+                **reasoning_options,
                 "num_predict": budget.value,
             },
         )
@@ -192,7 +213,7 @@ def run_ollama_generation(
             stream=False,
             format=OllamaMultipleChoiceAnswer.model_json_schema(),
             options={
-                **additional_options,
+                **answer_options,
                 "num_predict": final_answer_max_tokens,
             },
         )
