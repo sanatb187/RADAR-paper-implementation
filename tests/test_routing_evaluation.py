@@ -3,8 +3,13 @@ import torch
 
 from radar_bench.response_matrix import ResponseMatrix
 from radar_bench.routing_evaluation import (
+    RoutingEvaluation,
+    calculate_oracle_accuracy,
+    compare_routing_results,
+    count_configuration_selections,
     evaluate_fixed_configurations,
     evaluate_radar_routing,
+    select_best_fixed_result,
 )
 from radar_bench.schemas import (
     EvaluationRecord,
@@ -167,3 +172,82 @@ def test_rejects_wrong_probability_shape() -> None:
             },
             performance_weight=0.5,
         )
+
+
+def test_counts_configuration_selections() -> None:
+    result = RoutingEvaluation(
+        strategy="radar:0.5",
+        accuracy=0.5,
+        average_latency_seconds=2.0,
+        selected_configuration_ids=(
+            "config-b",
+            "config-a",
+            "config-b",
+        ),
+    )
+
+    assert count_configuration_selections(result) == {
+        "config-a": 1,
+        "config-b": 2,
+    }
+
+
+def test_calculates_oracle_accuracy() -> None:
+    matrix = ResponseMatrix.from_records(make_records())
+
+    assert calculate_oracle_accuracy(matrix) == 1.0
+
+
+def test_selects_best_fixed_result_by_accuracy_then_latency() -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    results = evaluate_fixed_configurations(
+        matrix,
+        records,
+    )
+
+    best_result = select_best_fixed_result(results)
+
+    assert best_result.strategy == "fixed:config-a"
+    assert best_result.accuracy == 0.5
+    assert best_result.average_latency_seconds == 1.0
+
+
+def test_compares_routing_results_query_by_query() -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    fixed_results = evaluate_fixed_configurations(
+        matrix,
+        records,
+    )
+
+    radar_result = evaluate_radar_routing(
+        torch.tensor(
+            [
+                [0.9, 0.1],
+                [0.1, 0.9],
+            ]
+        ),
+        matrix,
+        records,
+        {
+            "config-a": 0.0,
+            "config-b": 1.0,
+        },
+        performance_weight=1.0,
+    )
+
+    comparison = compare_routing_results(
+        radar_result,
+        fixed_results[0],
+        matrix,
+    )
+
+    assert comparison.candidate_strategy == "radar:1"
+    assert comparison.baseline_strategy == "fixed:config-a"
+    assert comparison.improved_query_ids == ("query-2",)
+    assert comparison.regressed_query_ids == ()
+    assert comparison.both_correct_query_ids == ("query-1",)
+    assert comparison.both_incorrect_query_ids == ()

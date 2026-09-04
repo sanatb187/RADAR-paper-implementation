@@ -11,9 +11,13 @@ from radar_bench.embeddings import embed_queries
 from radar_bench.irt import train_irt_model
 from radar_bench.response_matrix import ResponseMatrix
 from radar_bench.routing_evaluation import (
+    PairedRoutingComparison,
     RoutingEvaluation,
+    calculate_oracle_accuracy,
+    compare_routing_results,
     evaluate_fixed_configurations,
     evaluate_radar_routing,
+    select_best_fixed_result,
 )
 from radar_bench.schemas import EvaluationRecord, Query
 
@@ -27,8 +31,13 @@ QueryEmbeddingFunction = Callable[
 class RadarEvaluationReport:
     training_loss_history: tuple[float, ...]
     normalized_latency_costs: dict[str, float]
+    train_fixed_results: tuple[RoutingEvaluation, ...]
     fixed_results: tuple[RoutingEvaluation, ...]
     radar_results: tuple[RoutingEvaluation, ...]
+    best_fixed_result: RoutingEvaluation
+    train_oracle_accuracy: float
+    test_oracle_accuracy: float
+    radar_comparisons: tuple[PairedRoutingComparison, ...]
 
 
 def _order_queries(
@@ -124,10 +133,17 @@ def evaluate_radar_experiment(
     )
     normalized_latency_costs = normalize_costs(latency_costs)
 
+    train_fixed_results = evaluate_fixed_configurations(
+        train_matrix,
+        train_records,
+    )
+
     fixed_results = evaluate_fixed_configurations(
         test_matrix,
         test_records,
     )
+
+    best_fixed_result = select_best_fixed_result(fixed_results)
 
     radar_results = tuple(
         evaluate_radar_routing(
@@ -140,9 +156,23 @@ def evaluate_radar_experiment(
         for performance_weight in performance_weights
     )
 
+    radar_comparisons = tuple(
+        compare_routing_results(
+            radar_result,
+            best_fixed_result,
+            test_matrix,
+        )
+        for radar_result in radar_results
+    )
+
     return RadarEvaluationReport(
         training_loss_history=tuple(loss_history),
-        normalized_latency_costs=(normalized_latency_costs),
+        normalized_latency_costs=normalized_latency_costs,
+        train_fixed_results=train_fixed_results,
         fixed_results=fixed_results,
         radar_results=radar_results,
+        best_fixed_result=best_fixed_result,
+        train_oracle_accuracy=calculate_oracle_accuracy(train_matrix),
+        test_oracle_accuracy=calculate_oracle_accuracy(test_matrix),
+        radar_comparisons=radar_comparisons,
     )
