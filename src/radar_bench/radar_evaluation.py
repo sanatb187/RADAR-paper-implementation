@@ -38,6 +38,11 @@ class RadarEvaluationReport:
     train_oracle_accuracy: float
     test_oracle_accuracy: float
     radar_comparisons: tuple[PairedRoutingComparison, ...]
+    configuration_abilities: dict[str, float]
+    train_mean_predicted_probabilities: dict[str, float]
+    test_mean_predicted_probabilities: dict[str, float]
+    train_negative_discrimination_fraction: float
+    test_negative_discrimination_fraction: float
 
 
 def _order_queries(
@@ -78,10 +83,12 @@ def evaluate_radar_experiment(
         0.75,
         1.0,
     ),
-    num_epochs: int = 500,
-    learning_rate: float = 0.01,
+    num_epochs: int = 100,
+    learning_rate: float = 5e-4,
+    batch_size: int = 32,
+    max_gradient_norm: float = 1.0,
     random_seed: int = 42,
-    embedding_function: QueryEmbeddingFunction = (embed_queries),
+    embedding_function: QueryEmbeddingFunction = embed_queries,
 ) -> RadarEvaluationReport:
     """Train IRT and compare RADAR with fixed routing."""
 
@@ -120,12 +127,52 @@ def evaluate_radar_experiment(
             query_embeddings=train_embeddings,
             num_epochs=num_epochs,
             learning_rate=learning_rate,
+            batch_size=batch_size,
+            max_gradient_norm=max_gradient_norm,
         )
 
     model.eval()
 
     with torch.no_grad():
+        train_predicted_probabilities = model.predict_probabilities(train_embeddings)
         predicted_probabilities = model.predict_probabilities(test_embeddings)
+
+        train_discriminations = train_embeddings @ model.discrimination_weights
+        test_discriminations = test_embeddings @ model.discrimination_weights
+
+    configuration_abilities = {
+        configuration_id: float(ability)
+        for configuration_id, ability in zip(
+            train_matrix.configuration_ids,
+            model.abilities.detach().cpu().tolist(),
+            strict=True,
+        )
+    }
+
+    train_mean_predicted_probabilities = {
+        configuration_id: float(probability)
+        for configuration_id, probability in zip(
+            train_matrix.configuration_ids,
+            train_predicted_probabilities.mean(dim=1).cpu().tolist(),
+            strict=True,
+        )
+    }
+
+    test_mean_predicted_probabilities = {
+        configuration_id: float(probability)
+        for configuration_id, probability in zip(
+            test_matrix.configuration_ids,
+            predicted_probabilities.mean(dim=1).cpu().tolist(),
+            strict=True,
+        )
+    }
+
+    train_negative_discrimination_fraction = float(
+        (train_discriminations < 0).float().mean().item()
+    )
+    test_negative_discrimination_fraction = float(
+        (test_discriminations < 0).float().mean().item()
+    )
 
     latency_costs = estimate_configuration_latency_costs(
         train_records,
@@ -175,4 +222,9 @@ def evaluate_radar_experiment(
         train_oracle_accuracy=calculate_oracle_accuracy(train_matrix),
         test_oracle_accuracy=calculate_oracle_accuracy(test_matrix),
         radar_comparisons=radar_comparisons,
+        configuration_abilities=configuration_abilities,
+        train_mean_predicted_probabilities=train_mean_predicted_probabilities,
+        test_mean_predicted_probabilities=test_mean_predicted_probabilities,
+        train_negative_discrimination_fraction=train_negative_discrimination_fraction,
+        test_negative_discrimination_fraction=test_negative_discrimination_fraction,
     )

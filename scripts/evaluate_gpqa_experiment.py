@@ -10,6 +10,7 @@ from radar_bench.experiment import (
     load_evaluation_records,
 )
 from radar_bench.radar_evaluation import (
+    RadarEvaluationReport,
     evaluate_radar_experiment,
 )
 from radar_bench.routing_evaluation import (
@@ -44,12 +45,22 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--epochs",
         type=int,
-        default=500,
+        default=100,
     )
     parser.add_argument(
         "--learning-rate",
         type=float,
-        default=0.01,
+        default=5e-4,
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+    )
+    parser.add_argument(
+        "--max-gradient-norm",
+        type=float,
+        default=1.0,
     )
     parser.add_argument(
         "--seed",
@@ -132,6 +143,44 @@ def print_routing_diagnostics(
         print(f"Both incorrect: {len(comparison.both_incorrect_query_ids)}")
 
 
+def print_irt_diagnostics(
+    report: RadarEvaluationReport,
+) -> None:
+    train_observed = {
+        result.strategy.removeprefix("fixed:"): result.accuracy
+        for result in report.train_fixed_results
+    }
+    test_observed = {
+        result.strategy.removeprefix("fixed:"): result.accuracy
+        for result in report.fixed_results
+    }
+
+    print()
+    print("IRT diagnostics")
+    print(
+        "configuration | ability | train observed | "
+        "train predicted | test observed | test predicted"
+    )
+    print("-" * 110)
+
+    for configuration_id, ability in report.configuration_abilities.items():
+        print(
+            f"{configuration_id} | "
+            f"{ability:.3f} | "
+            f"{train_observed[configuration_id]:.3f} | "
+            f"{report.train_mean_predicted_probabilities[configuration_id]:.3f} | "
+            f"{test_observed[configuration_id]:.3f} | "
+            f"{report.test_mean_predicted_probabilities[configuration_id]:.3f}"
+        )
+
+    print()
+    print(
+        "Negative discrimination fraction: "
+        f"train={report.train_negative_discrimination_fraction:.3f}, "
+        f"test={report.test_negative_discrimination_fraction:.3f}"
+    )
+
+
 def main() -> None:
     arguments = parse_arguments()
 
@@ -163,6 +212,8 @@ def main() -> None:
         performance_weights=arguments.weights,
         num_epochs=arguments.epochs,
         learning_rate=arguments.learning_rate,
+        batch_size=arguments.batch_size,
+        max_gradient_norm=arguments.max_gradient_norm,
         random_seed=arguments.seed,
     )
 
@@ -171,6 +222,7 @@ def main() -> None:
     print(f"Test records: {len(test_records)}")
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
+    print_irt_diagnostics(report)
 
     print_results(
         "Training fixed-configuration results",
