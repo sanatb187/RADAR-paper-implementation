@@ -93,8 +93,10 @@ class TwoPLIRT(nn.Module):
 def train_irt_model(
     response_matrix: ResponseMatrix,
     query_embeddings: torch.Tensor,
-    num_epochs: int = 500,
-    learning_rate: float = 0.01,
+    num_epochs: int = 100,
+    learning_rate: float = 5e-4,
+    batch_size: int = 32,
+    max_gradient_norm: float = 1.0,
 ) -> tuple[TwoPLIRT, list[float]]:
     """Train a 2PL IRT model against a response matrix."""
 
@@ -116,6 +118,12 @@ def train_irt_model(
     if learning_rate <= 0:
         raise ValueError("learning_rate must be greater than zero")
 
+    if batch_size <= 0:
+        raise ValueError("batch_size must be greater than zero")
+
+    if max_gradient_norm <= 0:
+        raise ValueError("max_gradient_norm must be greater than zero")
+
     training_embeddings = query_embeddings.to(dtype=torch.float32)
 
     targets = torch.as_tensor(
@@ -135,19 +143,40 @@ def train_irt_model(
     )
     loss_function = nn.BCEWithLogitsLoss()
 
+    query_count = training_embeddings.shape[0]
     loss_history: list[float] = []
 
     model.train()
 
     for _ in range(num_epochs):
-        optimizer.zero_grad()
+        permutation = torch.randperm(
+            query_count,
+            device=training_embeddings.device,
+        )
 
-        logits = model(training_embeddings)
-        loss = loss_function(logits, targets)
+        epoch_loss = 0.0
 
-        loss.backward()
-        optimizer.step()
+        for start in range(0, query_count, batch_size):
+            batch_indices = permutation[start : start + batch_size]
+            batch_embeddings = training_embeddings[batch_indices]
+            batch_targets = targets[:, batch_indices]
 
-        loss_history.append(loss.item())
+            optimizer.zero_grad()
+
+            logits = model(batch_embeddings)
+            loss = loss_function(logits, batch_targets)
+
+            loss.backward()
+
+            nn.utils.clip_grad_norm_(
+                model.parameters(),
+                max_gradient_norm,
+            )
+
+            optimizer.step()
+
+            epoch_loss += loss.item() * len(batch_indices)
+
+        loss_history.append(epoch_loss / query_count)
 
     return model, loss_history

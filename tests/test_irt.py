@@ -145,6 +145,42 @@ def test_rejects_invalid_model_dimensions(
         )
 
 
+def test_training_rejects_invalid_batch_size() -> None:
+    response_matrix = ResponseMatrix(
+        values=np.array([[1, 0]], dtype=np.int8),
+        configuration_ids=("config-a",),
+        query_ids=("query-1", "query-2"),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="batch_size",
+    ):
+        train_irt_model(
+            response_matrix=response_matrix,
+            query_embeddings=torch.randn(2, 4),
+            batch_size=0,
+        )
+
+
+def test_training_rejects_invalid_gradient_norm() -> None:
+    response_matrix = ResponseMatrix(
+        values=np.array([[1, 0]], dtype=np.int8),
+        configuration_ids=("config-a",),
+        query_ids=("query-1", "query-2"),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="max_gradient_norm",
+    ):
+        train_irt_model(
+            response_matrix=response_matrix,
+            query_embeddings=torch.randn(2, 4),
+            max_gradient_norm=0.0,
+        )
+
+
 def test_training_reduces_loss() -> None:
     torch.manual_seed(42)
 
