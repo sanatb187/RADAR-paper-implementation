@@ -214,6 +214,19 @@ def print_cost_diagnostics(
         print(f"{configuration_id} | {cost:.6f}")
 
 
+def print_hypervolume(
+    report: RadarEvaluationReport,
+) -> None:
+    difference = report.radar_hypervolume - report.fixed_hypervolume
+
+    print()
+    print("Hypervolume")
+    print("-" * 70)
+    print(f"Fixed-configuration frontier: {report.fixed_hypervolume:.6f}")
+    print(f"RADAR frontier: {report.radar_hypervolume:.6f}")
+    print(f"RADAR difference: {difference:+.6f}")
+
+
 def main() -> None:
     arguments = parse_arguments()
 
@@ -296,6 +309,8 @@ def main() -> None:
         "RADAR routing",
         report.radar_results,
     )
+
+    print_hypervolume(report)
 
     print_routing_diagnostics(
         report.radar_results,

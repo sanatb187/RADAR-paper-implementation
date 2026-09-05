@@ -10,6 +10,10 @@ from radar_bench.cost import (
 )
 from radar_bench.embeddings import embed_queries
 from radar_bench.irt import train_irt_model
+from radar_bench.metrics import (
+    build_performance_cost_points,
+    calculate_hypervolume,
+)
 from radar_bench.response_matrix import ResponseMatrix
 from radar_bench.routing_evaluation import (
     PairedRoutingComparison,
@@ -51,6 +55,8 @@ class RadarEvaluationReport:
     test_mean_predicted_probabilities: dict[str, float]
     train_negative_discrimination_fraction: float
     test_negative_discrimination_fraction: float
+    fixed_hypervolume: float
+    radar_hypervolume: float
 
 
 def _order_queries(
@@ -219,6 +225,17 @@ def evaluate_radar_experiment(
         for performance_weight in performance_weights
     )
 
+    fixed_points = build_performance_cost_points(
+        fixed_results,
+        normalized_costs,
+    )
+    radar_points = build_performance_cost_points(
+        radar_results,
+        normalized_costs,
+    )
+
+    fixed_hypervolume = calculate_hypervolume(fixed_points)
+    radar_hypervolume = calculate_hypervolume(radar_points)
     radar_comparisons = tuple(
         compare_routing_results(
             radar_result,
@@ -244,4 +261,6 @@ def evaluate_radar_experiment(
         test_mean_predicted_probabilities=test_mean_predicted_probabilities,
         train_negative_discrimination_fraction=train_negative_discrimination_fraction,
         test_negative_discrimination_fraction=test_negative_discrimination_fraction,
+        fixed_hypervolume=fixed_hypervolume,
+        radar_hypervolume=radar_hypervolume,
     )
