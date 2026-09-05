@@ -71,6 +71,14 @@ def parse_arguments() -> argparse.Namespace:
         "--revision",
         default=GPQA_REVISION,
     )
+    parser.add_argument(
+        "--scalarization",
+        choices=(
+            "linear",
+            "chebyshev",
+        ),
+        default="linear",
+    )
 
     return parser.parse_args()
 
@@ -214,6 +222,7 @@ def main() -> None:
         learning_rate=arguments.learning_rate,
         batch_size=arguments.batch_size,
         max_gradient_norm=arguments.max_gradient_norm,
+        scalarization=arguments.scalarization,
         random_seed=arguments.seed,
     )
 

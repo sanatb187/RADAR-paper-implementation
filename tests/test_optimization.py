@@ -2,8 +2,10 @@ import pytest
 import torch
 
 from radar_bench.optimization import (
+    calculate_chebyshev_penalties,
     calculate_linear_scores,
     select_configuration,
+    select_configuration_chebyshev,
 )
 
 CONFIGURATION_IDS = (
@@ -132,3 +134,88 @@ def test_rejects_probability_outside_valid_range() -> None:
             normalized_costs=NORMALIZED_COSTS,
             performance_weight=0.5,
         )
+
+
+def test_calculate_chebyshev_penalties() -> None:
+    penalties = calculate_chebyshev_penalties(
+        predicted_probabilities=PROBABILITIES,
+        configuration_ids=CONFIGURATION_IDS,
+        normalized_costs=NORMALIZED_COSTS,
+        performance_weight=0.5,
+    )
+
+    expected = torch.tensor(
+        [
+            0.5,
+            0.15,
+            0.3,
+        ]
+    )
+
+    assert torch.allclose(
+        penalties,
+        expected,
+    )
+
+
+def test_chebyshev_selects_balanced_configuration() -> None:
+    selected = select_configuration_chebyshev(
+        predicted_probabilities=PROBABILITIES,
+        configuration_ids=CONFIGURATION_IDS,
+        normalized_costs=NORMALIZED_COSTS,
+        performance_weight=0.5,
+    )
+
+    assert selected == "balanced"
+
+
+@pytest.mark.parametrize(
+    ("performance_weight", "expected_configuration"),
+    [
+        (0.0, "low-cost"),
+        (1.0, "high-performance"),
+    ],
+)
+def test_chebyshev_handles_objective_endpoints(
+    performance_weight: float,
+    expected_configuration: str,
+) -> None:
+    selected = select_configuration_chebyshev(
+        predicted_probabilities=PROBABILITIES,
+        configuration_ids=CONFIGURATION_IDS,
+        normalized_costs=NORMALIZED_COSTS,
+        performance_weight=performance_weight,
+    )
+
+    assert selected == expected_configuration
+
+
+def test_chebyshev_can_recover_compromise_missed_by_linear() -> None:
+    probabilities = torch.tensor(
+        [
+            0.9,
+            0.6,
+            0.4,
+        ]
+    )
+    costs = {
+        "high-performance": 1.0,
+        "balanced": 0.4,
+        "low-cost": 0.0,
+    }
+
+    linear_selection = select_configuration(
+        predicted_probabilities=probabilities,
+        configuration_ids=CONFIGURATION_IDS,
+        normalized_costs=costs,
+        performance_weight=0.5,
+    )
+    chebyshev_selection = select_configuration_chebyshev(
+        predicted_probabilities=probabilities,
+        configuration_ids=CONFIGURATION_IDS,
+        normalized_costs=costs,
+        performance_weight=0.5,
+    )
+
+    assert linear_selection == "low-cost"
+    assert chebyshev_selection == "balanced"
