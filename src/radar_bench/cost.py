@@ -1,5 +1,10 @@
+import json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from pathlib import Path
+from typing import Literal
+
+from pydantic import TypeAdapter
 
 from radar_bench.schemas import (
     EvaluationRecord,
@@ -8,7 +13,15 @@ from radar_bench.schemas import (
     TokenUsage,
 )
 
+CostMetric = Literal[
+    "latency",
+    "output-tokens",
+    "token-price",
+]
+
 TOKENS_PER_MILLION = 1_000_000
+
+PRICING_LIST_ADAPTER = TypeAdapter(list[Pricing])
 
 
 def calculate_generation_cost(
@@ -158,3 +171,124 @@ def estimate_configuration_latency_costs(
         )
         for configuration_id in configuration_ids
     }
+
+
+def estimate_configuration_output_token_costs(
+    evaluation_records: Sequence[EvaluationRecord],
+    configuration_ids: Sequence[str],
+) -> dict[str, float]:
+    """Estimate average generated-token usage for each configuration."""
+
+    requested_ids = tuple(configuration_ids)
+
+    if not requested_ids:
+        raise ValueError("configuration_ids cannot be empty")
+
+    if len(set(requested_ids)) != len(requested_ids):
+        raise ValueError("configuration_ids must be unique")
+
+    requested_id_set = set(requested_ids)
+
+    total_tokens = {configuration_id: 0.0 for configuration_id in requested_ids}
+    record_counts = {configuration_id: 0 for configuration_id in requested_ids}
+
+    for record in evaluation_records:
+        configuration_id = record.generation.configuration_id
+
+        if configuration_id not in requested_id_set:
+            continue
+
+        total_tokens[configuration_id] += record.generation.token_usage.output_tokens
+        record_counts[configuration_id] += 1
+
+    average_tokens: dict[str, float] = {}
+
+    for configuration_id in requested_ids:
+        if record_counts[configuration_id] == 0:
+            raise ValueError(
+                f"No evaluation records found for configuration ID: {configuration_id}"
+            )
+
+        average_tokens[configuration_id] = (
+            total_tokens[configuration_id] / record_counts[configuration_id]
+        )
+
+    return average_tokens
+
+
+def estimate_routing_costs(
+    evaluation_records: Sequence[EvaluationRecord],
+    configuration_ids: Sequence[str],
+    *,
+    metric: CostMetric,
+    configurations: Sequence[ModelConfiguration] | None = None,
+    pricing_by_model_id: Mapping[str, Pricing] | None = None,
+) -> dict[str, float]:
+    """Estimate routing costs using the selected cost metric."""
+
+    if metric == "latency":
+        return estimate_configuration_latency_costs(
+            evaluation_records,
+            configuration_ids,
+        )
+
+    if metric == "output-tokens":
+        return estimate_configuration_output_token_costs(
+            evaluation_records,
+            configuration_ids,
+        )
+
+    if metric == "token-price":
+        if configurations is None:
+            raise ValueError("configurations are required for token-price cost")
+
+        if pricing_by_model_id is None:
+            raise ValueError("pricing_by_model_id is required for token-price cost")
+
+        configurations_by_id = {
+            configuration.configuration_id: configuration
+            for configuration in configurations
+        }
+
+        missing_configuration_ids = [
+            configuration_id
+            for configuration_id in configuration_ids
+            if configuration_id not in configurations_by_id
+        ]
+
+        if missing_configuration_ids:
+            raise ValueError(
+                "Missing configurations: " + ", ".join(missing_configuration_ids)
+            )
+
+        selected_configurations = [
+            configurations_by_id[configuration_id]
+            for configuration_id in configuration_ids
+        ]
+
+        return estimate_configuration_costs(
+            evaluation_records,
+            selected_configurations,
+            pricing_by_model_id,
+        )
+
+    raise ValueError(f"Unsupported cost metric: {metric}")
+
+
+def load_pricing_file(
+    path: Path,
+) -> dict[str, Pricing]:
+    """Load a versioned model-pricing table from JSON."""
+
+    raw_pricing = json.loads(path.read_text(encoding="utf-8"))
+    pricing_entries = PRICING_LIST_ADAPTER.validate_python(raw_pricing)
+
+    if not pricing_entries:
+        raise ValueError("Pricing file cannot be empty")
+
+    pricing_by_model_id = {pricing.model_id: pricing for pricing in pricing_entries}
+
+    if len(pricing_by_model_id) != len(pricing_entries):
+        raise ValueError("Pricing file contains duplicate model IDs")
+
+    return pricing_by_model_id

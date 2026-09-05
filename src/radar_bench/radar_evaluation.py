@@ -1,10 +1,11 @@
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 import torch
 
 from radar_bench.cost import (
-    estimate_configuration_latency_costs,
+    CostMetric,
+    estimate_routing_costs,
     normalize_costs,
 )
 from radar_bench.embeddings import embed_queries
@@ -20,7 +21,12 @@ from radar_bench.routing_evaluation import (
     evaluate_radar_routing,
     select_best_fixed_result,
 )
-from radar_bench.schemas import EvaluationRecord, Query
+from radar_bench.schemas import (
+    EvaluationRecord,
+    ModelConfiguration,
+    Pricing,
+    Query,
+)
 
 QueryEmbeddingFunction = Callable[
     [Sequence[Query]],
@@ -31,7 +37,8 @@ QueryEmbeddingFunction = Callable[
 @dataclass(frozen=True)
 class RadarEvaluationReport:
     training_loss_history: tuple[float, ...]
-    normalized_latency_costs: dict[str, float]
+    cost_metric: CostMetric
+    normalized_costs: dict[str, float]
     train_fixed_results: tuple[RoutingEvaluation, ...]
     fixed_results: tuple[RoutingEvaluation, ...]
     radar_results: tuple[RoutingEvaluation, ...]
@@ -91,6 +98,9 @@ def evaluate_radar_experiment(
     random_seed: int = 42,
     embedding_function: QueryEmbeddingFunction = embed_queries,
     scalarization: ScalarizationMethod = "linear",
+    cost_metric: CostMetric = "latency",
+    configurations: Sequence[ModelConfiguration] | None = None,
+    pricing_by_model_id: Mapping[str, Pricing] | None = None,
 ) -> RadarEvaluationReport:
     """Train IRT and compare RADAR with fixed routing."""
 
@@ -176,11 +186,14 @@ def evaluate_radar_experiment(
         (test_discriminations < 0).float().mean().item()
     )
 
-    latency_costs = estimate_configuration_latency_costs(
+    costs = estimate_routing_costs(
         train_records,
         train_matrix.configuration_ids,
+        metric=cost_metric,
+        configurations=configurations,
+        pricing_by_model_id=pricing_by_model_id,
     )
-    normalized_latency_costs = normalize_costs(latency_costs)
+    normalized_costs = normalize_costs(costs)
 
     train_fixed_results = evaluate_fixed_configurations(
         train_matrix,
@@ -199,7 +212,7 @@ def evaluate_radar_experiment(
             predicted_probabilities,
             test_matrix,
             test_records,
-            normalized_latency_costs,
+            normalized_costs,
             performance_weight=performance_weight,
             scalarization=scalarization,
         )
@@ -217,7 +230,8 @@ def evaluate_radar_experiment(
 
     return RadarEvaluationReport(
         training_loss_history=tuple(loss_history),
-        normalized_latency_costs=normalized_latency_costs,
+        cost_metric=cost_metric,
+        normalized_costs=normalized_costs,
         train_fixed_results=train_fixed_results,
         fixed_results=fixed_results,
         radar_results=radar_results,
