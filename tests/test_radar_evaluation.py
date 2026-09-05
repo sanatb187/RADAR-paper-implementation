@@ -1,3 +1,4 @@
+import math
 from collections.abc import Sequence
 
 import torch
@@ -135,8 +136,30 @@ def test_evaluates_radar_experiment() -> None:
         performance_weights=(0.0, 1.0),
         num_epochs=20,
         embedding_function=fake_embeddings,
+        random_seed=7,
     )
 
+    assert math.isfinite(report.test_irt_loss)
+    assert report.test_irt_loss >= 0.0
+
+    configuration_ids = {
+        "config-a",
+        "config-b",
+    }
+
+    probability_statistics = (
+        report.train_probability_ranges,
+        report.test_probability_ranges,
+        report.train_probability_standard_deviations,
+        report.test_probability_standard_deviations,
+    )
+
+    for statistics in probability_statistics:
+        assert set(statistics) == configuration_ids
+        assert all(
+            math.isfinite(value) and 0.0 <= value <= 1.0
+            for value in statistics.values()
+        )
     assert len(report.training_loss_history) == 20
 
     assert report.normalized_costs == {
@@ -153,3 +176,26 @@ def test_evaluates_radar_experiment() -> None:
     assert lowest_cost_result.selected_configuration_ids == ("config-a", "config-a")
     assert lowest_cost_result.accuracy == 0.5
     assert lowest_cost_result.average_latency_seconds == 1.0
+
+    repeated_report = evaluate_radar_experiment(
+        train_queries,
+        test_queries,
+        train_records,
+        test_records,
+        performance_weights=(0.0, 1.0),
+        num_epochs=20,
+        random_seed=7,
+        embedding_function=fake_embeddings,
+    )
+
+    assert repeated_report.training_loss_history == report.training_loss_history
+    assert repeated_report.test_irt_loss == report.test_irt_loss
+    assert (
+        repeated_report.test_mean_predicted_probabilities
+        == report.test_mean_predicted_probabilities
+    )
+    assert repeated_report.test_probability_ranges == report.test_probability_ranges
+    assert (
+        repeated_report.test_probability_standard_deviations
+        == report.test_probability_standard_deviations
+    )

@@ -2,6 +2,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
 import torch
+from torch.nn import functional as F
 
 from radar_bench.cost import (
     CostMetric,
@@ -55,8 +56,13 @@ class RadarEvaluationReport:
     test_mean_predicted_probabilities: dict[str, float]
     train_negative_discrimination_fraction: float
     test_negative_discrimination_fraction: float
+    test_irt_loss: float
     fixed_hypervolume: float
     radar_hypervolume: float
+    train_probability_ranges: dict[str, float]
+    test_probability_ranges: dict[str, float]
+    train_probability_standard_deviations: dict[str, float]
+    test_probability_standard_deviations: dict[str, float]
 
 
 def _order_queries(
@@ -154,6 +160,76 @@ def evaluate_radar_experiment(
     with torch.no_grad():
         train_predicted_probabilities = model.predict_probabilities(train_embeddings)
         predicted_probabilities = model.predict_probabilities(test_embeddings)
+        test_logits = model(test_embeddings)
+
+        test_targets = torch.as_tensor(
+            test_matrix.values,
+            dtype=torch.float32,
+            device=test_logits.device,
+        )
+
+        test_irt_loss = float(
+            F.binary_cross_entropy_with_logits(
+                test_logits,
+                test_targets,
+            ).item()
+        )
+
+        train_probability_ranges = {
+            configuration_id: float(value)
+            for configuration_id, value in zip(
+                train_matrix.configuration_ids,
+                (
+                    train_predicted_probabilities.max(dim=1).values
+                    - train_predicted_probabilities.min(dim=1).values
+                )
+                .cpu()
+                .tolist(),
+                strict=True,
+            )
+        }
+
+        test_probability_ranges = {
+            configuration_id: float(value)
+            for configuration_id, value in zip(
+                test_matrix.configuration_ids,
+                (
+                    predicted_probabilities.max(dim=1).values
+                    - predicted_probabilities.min(dim=1).values
+                )
+                .cpu()
+                .tolist(),
+                strict=True,
+            )
+        }
+
+        train_probability_standard_deviations = {
+            configuration_id: float(value)
+            for configuration_id, value in zip(
+                train_matrix.configuration_ids,
+                train_predicted_probabilities.std(
+                    dim=1,
+                    unbiased=False,
+                )
+                .cpu()
+                .tolist(),
+                strict=True,
+            )
+        }
+
+        test_probability_standard_deviations = {
+            configuration_id: float(value)
+            for configuration_id, value in zip(
+                test_matrix.configuration_ids,
+                predicted_probabilities.std(
+                    dim=1,
+                    unbiased=False,
+                )
+                .cpu()
+                .tolist(),
+                strict=True,
+            )
+        }
 
         train_discriminations = train_embeddings @ model.discrimination_weights
         test_discriminations = test_embeddings @ model.discrimination_weights
@@ -259,8 +335,13 @@ def evaluate_radar_experiment(
         configuration_abilities=configuration_abilities,
         train_mean_predicted_probabilities=train_mean_predicted_probabilities,
         test_mean_predicted_probabilities=test_mean_predicted_probabilities,
+        train_probability_ranges=train_probability_ranges,
+        test_probability_ranges=test_probability_ranges,
+        train_probability_standard_deviations=train_probability_standard_deviations,
+        test_probability_standard_deviations=test_probability_standard_deviations,
         train_negative_discrimination_fraction=train_negative_discrimination_fraction,
         test_negative_discrimination_fraction=test_negative_discrimination_fraction,
+        test_irt_loss=test_irt_loss,
         fixed_hypervolume=fixed_hypervolume,
         radar_hypervolume=radar_hypervolume,
     )

@@ -92,6 +92,12 @@ def parse_arguments() -> argparse.Namespace:
         "--pricing-file",
         type=Path,
     )
+    parser.add_argument(
+        "--irt-seed",
+        type=int,
+        default=None,
+        help="Random seed for IRT training; defaults to --seed.",
+    )
 
     return parser.parse_args()
 
@@ -202,6 +208,24 @@ def print_irt_diagnostics(
     )
 
 
+def print_probability_variation(
+    report: RadarEvaluationReport,
+) -> None:
+    print()
+    print("Predicted probability variation")
+    print("configuration | train range | train std | test range | test std")
+    print("-" * 90)
+
+    for configuration_id in report.configuration_abilities:
+        print(
+            f"{configuration_id} | "
+            f"{report.train_probability_ranges[configuration_id]:.6f} | "
+            f"{report.train_probability_standard_deviations[configuration_id]:.6f} | "
+            f"{report.test_probability_ranges[configuration_id]:.6f} | "
+            f"{report.test_probability_standard_deviations[configuration_id]:.6f}"
+        )
+
+
 def print_cost_diagnostics(
     report: RadarEvaluationReport,
 ) -> None:
@@ -262,6 +286,7 @@ def main() -> None:
         test_query_ids,
     )
 
+    irt_seed = arguments.seed if arguments.irt_seed is None else arguments.irt_seed
     report = evaluate_radar_experiment(
         train_queries,
         test_queries,
@@ -276,16 +301,19 @@ def main() -> None:
         cost_metric=arguments.cost_metric,
         configurations=configurations,
         pricing_by_model_id=pricing_by_model_id,
-        random_seed=arguments.seed,
+        random_seed=irt_seed,
     )
 
     print("RADAR evaluation completed")
     print(f"Train records: {len(train_records)}")
     print(f"Test records: {len(test_records)}")
     print(f"Routing cost metric: {report.cost_metric}")
+    print(f"IRT training seed: {irt_seed}")
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
+    print(f"Test IRT loss: {report.test_irt_loss:.6f}")
     print_irt_diagnostics(report)
+    print_probability_variation(report)
     print_cost_diagnostics(report)
 
     print_results(
