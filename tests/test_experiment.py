@@ -229,3 +229,48 @@ def test_rejects_invalid_jsonl(
         match="Invalid evaluation record on line 1",
     ):
         load_evaluation_records(output_path)
+
+
+def test_sequential_configuration_runs_share_output(
+    tmp_path: Path,
+) -> None:
+    output_path = tmp_path / "records.jsonl"
+    queries = [make_query(0)]
+    calls: list[str] = []
+
+    def capture_generation(**kwargs: Any) -> GenerationResult:
+        configuration: ModelConfiguration = kwargs["configuration"]
+        calls.append(configuration.configuration_id)
+        return make_generation(**kwargs)
+
+    first_records = run_gpqa_experiment(
+        queries,
+        [make_configuration(0)],
+        output_path=output_path,
+        generation_function=capture_generation,
+    )
+
+    assert len(first_records) == 1
+    assert calls == ["qwen3-0.6b__tokens-0"]
+
+    calls.clear()
+
+    combined_records = run_gpqa_experiment(
+        queries,
+        [make_configuration(256)],
+        output_path=output_path,
+        generation_function=capture_generation,
+    )
+
+    assert len(combined_records) == 2
+    assert calls == ["qwen3-0.6b__tokens-256"]
+
+    saved_configuration_ids = {
+        record.generation.configuration_id
+        for record in load_evaluation_records(output_path)
+    }
+
+    assert saved_configuration_ids == {
+        "qwen3-0.6b__tokens-0",
+        "qwen3-0.6b__tokens-256",
+    }
