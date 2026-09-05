@@ -23,6 +23,17 @@ QWEN3_OLLAMA_MODELS: tuple[ModelSpec, ...] = (
     ),
 )
 
+QWEN3_VLLM_MODELS: tuple[ModelSpec, ...] = (
+    ModelSpec(
+        model_id="qwen3-4b-awq",
+        litellm_model="openai/qwen3-4b-awq",
+    ),
+    ModelSpec(
+        model_id="qwen3-8b-awq",
+        litellm_model="openai/qwen3-8b-awq",
+    ),
+)
+
 QWEN3_REASONING_BUDGETS: tuple[int, ...] = (
     0,
     256,
@@ -45,5 +56,19 @@ def build_qwen3_ollama_configurations() -> list[ModelConfiguration]:
             reasoning_budget=TokenBudget(value=budget),
         )
         for model in QWEN3_OLLAMA_MODELS
+        for budget in QWEN3_REASONING_BUDGETS
+    ]
+
+
+def build_qwen3_vllm_configurations() -> list[ModelConfiguration]:
+    """Build Qwen3 AWQ configurations for a vLLM server."""
+
+    return [
+        ModelConfiguration(
+            configuration_id=(f"{model.model_id}__tokens-{budget}"),
+            model_spec=model,
+            reasoning_budget=TokenBudget(value=budget),
+        )
+        for model in QWEN3_VLLM_MODELS
         for budget in QWEN3_REASONING_BUDGETS
     ]
