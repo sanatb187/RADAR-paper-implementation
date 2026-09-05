@@ -13,6 +13,7 @@ from radar_bench.response_matrix import ResponseMatrix
 from radar_bench.routing_evaluation import (
     PairedRoutingComparison,
     RoutingEvaluation,
+    ScalarizationMethod,
     calculate_oracle_accuracy,
     compare_routing_results,
     evaluate_fixed_configurations,
@@ -89,6 +90,7 @@ def evaluate_radar_experiment(
     max_gradient_norm: float = 1.0,
     random_seed: int = 42,
     embedding_function: QueryEmbeddingFunction = embed_queries,
+    scalarization: ScalarizationMethod = "linear",
 ) -> RadarEvaluationReport:
     """Train IRT and compare RADAR with fixed routing."""
 
@@ -199,6 +201,7 @@ def evaluate_radar_experiment(
             test_records,
             normalized_latency_costs,
             performance_weight=performance_weight,
+            scalarization=scalarization,
         )
         for performance_weight in performance_weights
     )

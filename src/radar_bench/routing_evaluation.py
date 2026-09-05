@@ -1,14 +1,21 @@
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Literal
 
 import torch
 
 from radar_bench.optimization import (
     select_configuration,
+    select_configuration_chebyshev,
 )
 from radar_bench.response_matrix import ResponseMatrix
 from radar_bench.schemas import EvaluationRecord
+
+ScalarizationMethod = Literal[
+    "linear",
+    "chebyshev",
+]
 
 
 @dataclass(frozen=True)
@@ -108,8 +115,18 @@ def evaluate_radar_routing(
     normalized_costs: Mapping[str, float],
     *,
     performance_weight: float,
+    scalarization: ScalarizationMethod = "linear",
 ) -> RoutingEvaluation:
     """Evaluate RADAR selections against observed results."""
+
+    if scalarization == "linear":
+        selection_function = select_configuration
+        strategy_prefix = "radar"
+    elif scalarization == "chebyshev":
+        selection_function = select_configuration_chebyshev
+        strategy_prefix = "radar-chebyshev"
+    else:
+        raise ValueError(f"Unknown scalarization method: {scalarization}")
 
     expected_shape = (
         len(response_matrix.configuration_ids),
@@ -137,7 +154,7 @@ def evaluate_radar_routing(
     total_latency = 0.0
 
     for column, query_id in enumerate(response_matrix.query_ids):
-        selected_configuration_id = select_configuration(
+        selected_configuration_id = selection_function(
             predicted_probabilities=(predicted_probabilities[:, column]),
             configuration_ids=(response_matrix.configuration_ids),
             normalized_costs=normalized_costs,
@@ -157,7 +174,7 @@ def evaluate_radar_routing(
     query_count = len(response_matrix.query_ids)
 
     return RoutingEvaluation(
-        strategy=f"radar:{performance_weight:g}",
+        strategy=(f"{strategy_prefix}:{performance_weight:g}"),
         accuracy=correct_count / query_count,
         average_latency_seconds=(total_latency / query_count),
         selected_configuration_ids=tuple(selected_configuration_ids),

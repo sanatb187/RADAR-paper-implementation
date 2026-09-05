@@ -251,3 +251,32 @@ def test_compares_routing_results_query_by_query() -> None:
     assert comparison.regressed_query_ids == ()
     assert comparison.both_correct_query_ids == ("query-1",)
     assert comparison.both_incorrect_query_ids == ()
+
+
+def test_radar_supports_chebyshev_scalarization() -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    result = evaluate_radar_routing(
+        torch.tensor(
+            [
+                [0.9, 0.1],
+                [0.1, 0.9],
+            ]
+        ),
+        matrix,
+        records,
+        {
+            "config-a": 0.0,
+            "config-b": 1.0,
+        },
+        performance_weight=1.0,
+        scalarization="chebyshev",
+    )
+
+    assert result.strategy == "radar-chebyshev:1"
+    assert result.accuracy == 1.0
+    assert result.selected_configuration_ids == (
+        "config-a",
+        "config-b",
+    )
