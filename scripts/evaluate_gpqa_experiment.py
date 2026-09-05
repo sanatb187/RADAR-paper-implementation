@@ -9,6 +9,9 @@ from radar_bench.datasets.gpqa import (
 from radar_bench.experiment import (
     load_evaluation_records,
 )
+from radar_bench.irt_selection import (
+    SMALL_DATA_IRT_CANDIDATES,
+)
 from radar_bench.radar_evaluation import (
     RadarEvaluationReport,
     evaluate_radar_experiment,
@@ -70,6 +73,19 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--revision",
         default=GPQA_REVISION,
+    )
+    parser.add_argument(
+        "--tune-irt",
+        action="store_true",
+        help=(
+            "Select IRT epochs and learning rate using a validation "
+            "subset of the training queries."
+        ),
+    )
+    parser.add_argument(
+        "--validation-fraction",
+        type=float,
+        default=0.2,
     )
 
     return parser.parse_args()
@@ -215,6 +231,8 @@ def main() -> None:
         batch_size=arguments.batch_size,
         max_gradient_norm=arguments.max_gradient_norm,
         random_seed=arguments.seed,
+        irt_candidates=(SMALL_DATA_IRT_CANDIDATES if arguments.tune_irt else None),
+        validation_fraction=arguments.validation_fraction,
     )
 
     print("RADAR evaluation completed")
@@ -222,6 +240,14 @@ def main() -> None:
     print(f"Test records: {len(test_records)}")
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
+    if report.irt_selection is not None:
+        selected = report.irt_selection.selected_hyperparameters
+
+        print()
+        print("Small-data IRT selection")
+        print(f"Selected epochs: {selected.num_epochs}")
+        print(f"Selected learning rate: {selected.learning_rate:g}")
+        print(f"Validation loss: {report.irt_selection.validation_loss:.6f}")
     print_irt_diagnostics(report)
 
     print_results(

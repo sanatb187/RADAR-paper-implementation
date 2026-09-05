@@ -9,6 +9,11 @@ from radar_bench.cost import (
 )
 from radar_bench.embeddings import embed_queries
 from radar_bench.irt import train_irt_model
+from radar_bench.irt_selection import (
+    IRTHyperparameters,
+    IRTSelectionResult,
+    train_irt_model_with_selection,
+)
 from radar_bench.response_matrix import ResponseMatrix
 from radar_bench.routing_evaluation import (
     PairedRoutingComparison,
@@ -43,6 +48,7 @@ class RadarEvaluationReport:
     test_mean_predicted_probabilities: dict[str, float]
     train_negative_discrimination_fraction: float
     test_negative_discrimination_fraction: float
+    irt_selection: IRTSelectionResult | None
 
 
 def _order_queries(
@@ -87,6 +93,8 @@ def evaluate_radar_experiment(
     learning_rate: float = 5e-4,
     batch_size: int = 32,
     max_gradient_norm: float = 1.0,
+    irt_candidates: Sequence[IRTHyperparameters] | None = None,
+    validation_fraction: float = 0.2,
     random_seed: int = 42,
     embedding_function: QueryEmbeddingFunction = embed_queries,
 ) -> RadarEvaluationReport:
@@ -119,17 +127,37 @@ def evaluate_radar_experiment(
     if train_embeddings.shape[1] != test_embeddings.shape[1]:
         raise ValueError("Train and test embedding dimensions must match")
 
-    with torch.random.fork_rng(devices=[]):
-        torch.manual_seed(random_seed)
+    loss_history: Sequence[float]
+    irt_selection: IRTSelectionResult | None
 
-        model, loss_history = train_irt_model(
+    if irt_candidates is None:
+        with torch.random.fork_rng(devices=[]):
+            torch.manual_seed(random_seed)
+
+            model, loss_history = train_irt_model(
+                response_matrix=train_matrix,
+                query_embeddings=train_embeddings,
+                num_epochs=num_epochs,
+                learning_rate=learning_rate,
+                batch_size=batch_size,
+                max_gradient_norm=max_gradient_norm,
+            )
+
+        irt_selection = None
+    else:
+        selected_model = train_irt_model_with_selection(
             response_matrix=train_matrix,
             query_embeddings=train_embeddings,
-            num_epochs=num_epochs,
-            learning_rate=learning_rate,
+            candidates=irt_candidates,
+            validation_fraction=validation_fraction,
             batch_size=batch_size,
             max_gradient_norm=max_gradient_norm,
+            random_seed=random_seed,
         )
+
+        model = selected_model.model
+        loss_history = selected_model.loss_history
+        irt_selection = selected_model.selection
 
     model.eval()
 
@@ -223,6 +251,7 @@ def evaluate_radar_experiment(
         test_oracle_accuracy=calculate_oracle_accuracy(test_matrix),
         radar_comparisons=radar_comparisons,
         configuration_abilities=configuration_abilities,
+        irt_selection=irt_selection,
         train_mean_predicted_probabilities=train_mean_predicted_probabilities,
         test_mean_predicted_probabilities=test_mean_predicted_probabilities,
         train_negative_discrimination_fraction=train_negative_discrimination_fraction,
