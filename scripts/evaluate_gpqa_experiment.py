@@ -2,6 +2,10 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from radar_bench.configurations import (
+    build_qwen3_ollama_configurations,
+)
+from radar_bench.cost import load_pricing_file
 from radar_bench.datasets.gpqa import (
     GPQA_REVISION,
     load_gpqa_diamond_splits,
@@ -78,6 +82,15 @@ def parse_arguments() -> argparse.Namespace:
             "chebyshev",
         ),
         default="linear",
+    )
+    parser.add_argument(
+        "--cost-metric",
+        choices=("latency", "output-tokens", "token-price"),
+        default="latency",
+    )
+    parser.add_argument(
+        "--pricing-file",
+        type=Path,
     )
 
     return parser.parse_args()
@@ -189,8 +202,32 @@ def print_irt_diagnostics(
     )
 
 
+def print_cost_diagnostics(
+    report: RadarEvaluationReport,
+) -> None:
+    print()
+    print(f"Normalized routing costs ({report.cost_metric})")
+    print("configuration | normalized cost")
+    print("-" * 70)
+
+    for configuration_id, cost in report.normalized_costs.items():
+        print(f"{configuration_id} | {cost:.6f}")
+
+
 def main() -> None:
     arguments = parse_arguments()
+
+    configurations = None
+    pricing_by_model_id = None
+
+    if arguments.cost_metric == "token-price":
+        if arguments.pricing_file is None:
+            raise ValueError(
+                "--pricing-file is required when --cost-metric=token-price"
+            )
+
+        configurations = build_qwen3_ollama_configurations()
+        pricing_by_model_id = load_pricing_file(arguments.pricing_file)
 
     train_records = load_evaluation_records(arguments.train_records)
     test_records = load_evaluation_records(arguments.test_records)
@@ -223,15 +260,20 @@ def main() -> None:
         batch_size=arguments.batch_size,
         max_gradient_norm=arguments.max_gradient_norm,
         scalarization=arguments.scalarization,
+        cost_metric=arguments.cost_metric,
+        configurations=configurations,
+        pricing_by_model_id=pricing_by_model_id,
         random_seed=arguments.seed,
     )
 
     print("RADAR evaluation completed")
     print(f"Train records: {len(train_records)}")
     print(f"Test records: {len(test_records)}")
+    print(f"Routing cost metric: {report.cost_metric}")
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
     print_irt_diagnostics(report)
+    print_cost_diagnostics(report)
 
     print_results(
         "Training fixed-configuration results",

@@ -1,10 +1,14 @@
 from datetime import date
+from pathlib import Path
 
 import pytest
 
 from radar_bench.cost import (
     calculate_generation_cost,
     estimate_configuration_costs,
+    estimate_configuration_output_token_costs,
+    estimate_routing_costs,
+    load_pricing_file,
     normalize_costs,
 )
 from radar_bench.schemas import (
@@ -38,6 +42,7 @@ def make_record(
     reasoning_tokens: int,
     completion_tokens: int,
     prompt_tokens: int = 100,
+    latency_seconds: float = 1.0,
 ) -> EvaluationRecord:
     return EvaluationRecord(
         generation=GenerationResult(
@@ -51,7 +56,7 @@ def make_record(
                 reasoning_tokens=reasoning_tokens,
                 completion_tokens=completion_tokens,
             ),
-            latency_seconds=1.0,
+            latency_seconds=latency_seconds,
             run_index=0,
         ),
         parsed_answer="B",
@@ -232,3 +237,99 @@ def test_negative_cost_is_rejected() -> None:
                 "config-b": 2.0,
             }
         )
+
+
+def test_estimates_average_output_token_costs() -> None:
+    records = [
+        make_record(
+            "configuration-a",
+            "query-1",
+            reasoning_tokens=100,
+            completion_tokens=20,
+        ),
+        make_record(
+            "configuration-a",
+            "query-2",
+            reasoning_tokens=200,
+            completion_tokens=40,
+        ),
+    ]
+
+    costs = estimate_configuration_output_token_costs(
+        records,
+        ["configuration-a"],
+    )
+
+    assert costs == {
+        "configuration-a": 180.0,
+    }
+
+
+def test_selects_latency_routing_cost() -> None:
+    records = [
+        make_record(
+            "configuration-a",
+            "query-1",
+            reasoning_tokens=100,
+            completion_tokens=20,
+            latency_seconds=2.5,
+        ),
+    ]
+
+    costs = estimate_routing_costs(
+        records,
+        ["configuration-a"],
+        metric="latency",
+    )
+
+    assert costs == {
+        "configuration-a": 2.5,
+    }
+
+
+def test_selects_output_token_routing_cost() -> None:
+    records = [
+        make_record(
+            "configuration-a",
+            "query-1",
+            reasoning_tokens=100,
+            completion_tokens=20,
+        ),
+    ]
+
+    costs = estimate_routing_costs(
+        records,
+        ["configuration-a"],
+        metric="output-tokens",
+    )
+
+    assert costs == {
+        "configuration-a": 120.0,
+    }
+
+
+def test_loads_pricing_file(
+    tmp_path: Path,
+) -> None:
+    pricing_path = tmp_path / "pricing.json"
+
+    pricing_path.write_text(
+        """
+        [
+          {
+            "model_id": "qwen3-4b",
+            "input_price_per_million_tokens": 0.10,
+            "output_price_per_million_tokens": 0.20,
+            "currency": "USD",
+            "source": "test pricing",
+            "effective_date": "2026-09-05"
+          }
+        ]
+        """,
+        encoding="utf-8",
+    )
+
+    pricing = load_pricing_file(pricing_path)
+
+    assert set(pricing) == {"qwen3-4b"}
+    assert pricing["qwen3-4b"].output_price_per_million_tokens == 0.20

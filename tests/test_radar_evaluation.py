@@ -139,7 +139,7 @@ def test_evaluates_radar_experiment() -> None:
 
     assert len(report.training_loss_history) == 20
 
-    assert report.normalized_latency_costs == {
+    assert report.normalized_costs == {
         "config-a": 0.0,
         "config-b": 1.0,
     }
