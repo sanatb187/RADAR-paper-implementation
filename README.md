@@ -115,6 +115,49 @@ The `token-price` metric requires a JSON pricing file. For example:
 ]
 ```
 
+### Experiment provenance
+
+vLLM experiments require a runtime metadata file so that model, hardware,
+software, dataset, configuration, and Git provenance are recorded alongside
+the generated responses.
+
+Copy the example metadata before running an experiment:
+
+```bash
+cp \
+  configs/vllm-runtime-kaggle-t4.example.json \
+  configs/vllm-runtime-kaggle-t4.json
+```
+Populate the copied file with the exact model revision, vLLM and PyTorch
+versions, CUDA version, GPU model, quantization, and server arguments used by
+the active server.
+
+Pass the metadata and current Git commit to the experiment runner:
+
+```bash
+uv run python scripts/run_gpqa_vllm_experiment.py \
+  --model qwen3-4b-awq \
+  --budgets 0 256 1024 \
+  --train-count 16 \
+  --test-count 16 \
+  --runtime-metadata configs/vllm-runtime-kaggle-t4.json \
+  --git-commit "$(git rev-parse HEAD)" \
+  --output-dir outputs/gpqa-vllm
+```
+Use `--git-dirty` only when intentionally running with uncommitted changes.
+The runner creates a resumable manifest before generation and marks it
+completed after all expected records have been written.
+Then run:
+```bash
+uv run ruff format .
+uv run ruff check .
+uv run mypy src
+uv run pytest
+git diff --check
+git status --short --untracked-files=all
+git diff --stat
+```
+
 Run token-price evaluation with:
 
 ```bash

@@ -1,0 +1,18 @@
+{
+  "served_model_name": "qwen3-4b-awq",
+  "source_model": "Qwen/Qwen3-4B-AWQ",
+  "model_revision": "74d4bd2bd4bff9cafc9345221320bffb08b406a3",
+  "quantization": "awq",
+  "dtype": "float16",
+  "max_model_length": 4096,
+  "tensor_parallel_size": 1,
+  "vllm_version": "0.28.0",
+  "pytorch_version": "2.13.0+cu132",
+  "cuda_version": "13.2",
+  "gpu_model": "Tesla T4",
+  "server_arguments": {
+    "reasoning_parser": "qwen3",
+    "gpu_memory_utilization": 0.9,
+    "max_num_seqs": 1
+  }
+}

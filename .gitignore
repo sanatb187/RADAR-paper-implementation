@@ -21,6 +21,7 @@ htmlcov/
 !.env.example
 
 # Experiment artifacts
+configs/vllm-runtime-kaggle-t4.json
 data/
 outputs/
 results/
