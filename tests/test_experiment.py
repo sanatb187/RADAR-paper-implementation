@@ -8,13 +8,20 @@ from radar_bench.experiment import (
     run_gpqa_experiment,
     select_query_subset,
 )
+from radar_bench.provenance import (
+    build_manifest_filename,
+    count_configuration_records,
+    validate_runtime_model,
+)
 from radar_bench.schemas import (
+    EvaluationRecord,
     GenerationResult,
     ModelConfiguration,
     ModelSpec,
     Query,
     TokenBudget,
     TokenUsage,
+    VLLMRuntimeProvenance,
 )
 
 
@@ -274,3 +281,88 @@ def test_sequential_configuration_runs_share_output(
         "qwen3-0.6b__tokens-0",
         "qwen3-0.6b__tokens-256",
     }
+
+
+def test_builds_stable_manifest_filename() -> None:
+    configurations = [
+        make_configuration(256),
+        make_configuration(0),
+    ]
+
+    filename = build_manifest_filename(
+        "qwen3-0.6b",
+        configurations,
+    )
+
+    assert filename == ("manifest_qwen3-0.6b_budgets-0-256.json")
+
+
+def test_counts_only_requested_configuration_records() -> None:
+    query = make_query(0)
+    zero_configuration = make_configuration(0)
+    reasoning_configuration = make_configuration(256)
+
+    records = [
+        EvaluationRecord(
+            generation=make_generation(
+                query=query,
+                configuration=zero_configuration,
+                run_index=0,
+            ),
+            parsed_answer="B",
+            correct=True,
+        ),
+        EvaluationRecord(
+            generation=make_generation(
+                query=query,
+                configuration=reasoning_configuration,
+                run_index=0,
+            ),
+            parsed_answer="B",
+            correct=True,
+        ),
+    ]
+
+    count = count_configuration_records(
+        records,
+        {
+            zero_configuration.configuration_id,
+        },
+    )
+
+    assert count == 1
+
+
+def test_validates_runtime_model() -> None:
+    runtime = VLLMRuntimeProvenance(
+        served_model_name="qwen3-4b-awq",
+        source_model="Qwen/Qwen3-4B-AWQ",
+        model_revision="model-revision-1",
+        quantization="awq",
+        dtype="float16",
+        max_model_length=4096,
+        tensor_parallel_size=1,
+        vllm_version="0.28.0",
+        pytorch_version="2.13.0+cu132",
+        cuda_version="13.2",
+        gpu_model="Tesla T4",
+        server_arguments={
+            "gpu_memory_utilization": 0.9,
+            "max_num_seqs": 1,
+            "reasoning_parser": "qwen3",
+        },
+    )
+
+    validate_runtime_model(
+        runtime,
+        "qwen3-4b-awq",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="does not match --model",
+    ):
+        validate_runtime_model(
+            runtime,
+            "qwen3-8b-awq",
+        )

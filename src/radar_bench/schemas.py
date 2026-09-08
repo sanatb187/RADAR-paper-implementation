@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -36,13 +36,67 @@ class EffortBudget(RADARSchema):
     value: Literal["low", "medium", "high"]
 
 
-ReasoningBudget = Annotated[TokenBudget | EffortBudget, Field(discriminator="kind")]
+ReasoningBudget = Annotated[
+    TokenBudget | EffortBudget,
+    Field(discriminator="kind"),
+]
 
 
 class ModelConfiguration(RADARSchema):
     configuration_id: str
     model_spec: ModelSpec
     reasoning_budget: ReasoningBudget
+
+
+class VLLMRuntimeProvenance(RADARSchema):
+    served_model_name: str = Field(min_length=1)
+    source_model: str = Field(min_length=1)
+    model_revision: str = Field(min_length=1)
+    quantization: str | None = None
+    dtype: str = Field(min_length=1)
+    max_model_length: int = Field(gt=0)
+    tensor_parallel_size: int = Field(gt=0)
+    vllm_version: str = Field(min_length=1)
+    pytorch_version: str = Field(min_length=1)
+    cuda_version: str = Field(min_length=1)
+    gpu_model: str = Field(min_length=1)
+    server_arguments: dict[
+        str,
+        str | int | float | bool,
+    ]
+
+
+class ExperimentManifest(RADARSchema):
+    schema_version: Literal[1] = 1
+    status: Literal["planned", "completed"]
+    created_at: datetime
+    completed_at: datetime | None = None
+
+    git_commit: str = Field(min_length=1)
+    git_dirty: bool
+
+    dataset_id: str = Field(min_length=1)
+    dataset_config: str = Field(min_length=1)
+    dataset_revision: str = Field(min_length=1)
+    split_strategy: str = Field(min_length=1)
+    seed: int
+
+    train_query_ids: tuple[str, ...] = Field(min_length=1)
+    test_query_ids: tuple[str, ...] = Field(min_length=1)
+    configurations: tuple[ModelConfiguration, ...] = Field(min_length=1)
+
+    runtime: VLLMRuntimeProvenance
+    base_url: str = Field(min_length=1)
+    request_timeout_seconds: float = Field(gt=0)
+    request_options: dict[
+        str,
+        str | int | float | bool,
+    ]
+
+    train_output: str = Field(min_length=1)
+    test_output: str = Field(min_length=1)
+    train_record_count: int = Field(ge=0)
+    test_record_count: int = Field(ge=0)
 
 
 class TokenUsage(RADARSchema):

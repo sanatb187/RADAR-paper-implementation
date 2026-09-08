@@ -1,5 +1,6 @@
 import argparse
 from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,8 @@ from radar_bench.configurations import (
     build_qwen3_vllm_configurations,
 )
 from radar_bench.datasets.gpqa import (
+    GPQA_DATASET_ID,
+    GPQA_DIAMOND_CONFIG,
     GPQA_REVISION,
     load_gpqa_diamond_splits,
 )
@@ -16,7 +19,16 @@ from radar_bench.experiment import (
     run_gpqa_experiment,
     select_query_subset,
 )
+from radar_bench.provenance import (
+    build_manifest_filename,
+    complete_experiment_manifest,
+    count_configuration_records,
+    initialize_experiment_manifest,
+    load_vllm_runtime_provenance,
+    validate_runtime_model,
+)
 from radar_bench.schemas import (
+    ExperimentManifest,
     GenerationResult,
     ModelConfiguration,
     Query,
@@ -80,7 +92,22 @@ def parse_arguments() -> argparse.Namespace:
         type=Path,
         default=Path("outputs/gpqa-vllm"),
     )
-
+    parser.add_argument(
+        "--runtime-metadata",
+        type=Path,
+        required=True,
+        help="JSON file describing the active vLLM runtime.",
+    )
+    parser.add_argument(
+        "--git-commit",
+        required=True,
+        help="Git commit used for this experiment.",
+    )
+    parser.add_argument(
+        "--git-dirty",
+        action="store_true",
+        help="Record that the experiment used an uncommitted working tree.",
+    )
     return parser.parse_args()
 
 
@@ -143,6 +170,15 @@ def main() -> None:
         arguments.model,
         arguments.budgets,
     )
+    runtime = load_vllm_runtime_provenance(
+        arguments.runtime_metadata,
+    )
+    validate_runtime_model(
+        runtime,
+        arguments.model,
+    )
+
+    base_url = arguments.base_url.rstrip("/")
 
     splits = load_gpqa_diamond_splits(
         seed=arguments.seed,
@@ -167,6 +203,43 @@ def main() -> None:
     train_output = experiment_directory / f"train_n-{arguments.train_count}.jsonl"
     test_output = experiment_directory / f"test_n-{arguments.test_count}.jsonl"
 
+    request_options = {
+        "seed": arguments.seed,
+    }
+
+    manifest_path = experiment_directory / build_manifest_filename(
+        arguments.model,
+        configurations,
+    )
+
+    expected_manifest = ExperimentManifest(
+        status="planned",
+        created_at=datetime.now(UTC),
+        git_commit=arguments.git_commit,
+        git_dirty=arguments.git_dirty,
+        dataset_id=GPQA_DATASET_ID,
+        dataset_config=GPQA_DIAMOND_CONFIG,
+        dataset_revision=arguments.revision,
+        split_strategy="gpqa-diamond-deterministic-80-20",
+        seed=arguments.seed,
+        train_query_ids=tuple(query.query_id for query in train_queries),
+        test_query_ids=tuple(query.query_id for query in test_queries),
+        configurations=tuple(configurations),
+        runtime=runtime,
+        base_url=base_url,
+        request_timeout_seconds=arguments.request_timeout,
+        request_options=request_options,
+        train_output=str(train_output),
+        test_output=str(test_output),
+        train_record_count=0,
+        test_record_count=0,
+    )
+
+    manifest = initialize_experiment_manifest(
+        manifest_path,
+        expected_manifest,
+    )
+
     generation_count = (len(train_queries) + len(test_queries)) * len(configurations)
 
     print(f"Model: {arguments.model}")
@@ -176,13 +249,9 @@ def main() -> None:
     print(f"Planned generations: {generation_count}")
 
     generation_function = build_progress_generation_function(
-        base_url=arguments.base_url,
+        base_url=base_url,
         request_timeout_seconds=arguments.request_timeout,
     )
-
-    request_options = {
-        "seed": arguments.seed,
-    }
 
     train_records = run_gpqa_experiment(
         train_queries,
@@ -199,12 +268,52 @@ def main() -> None:
         request_options=request_options,
         generation_function=generation_function,
     )
+    configuration_ids = {
+        configuration.configuration_id for configuration in configurations
+    }
 
+    train_record_count = count_configuration_records(
+        train_records,
+        configuration_ids,
+    )
+    test_record_count = count_configuration_records(
+        test_records,
+        configuration_ids,
+    )
+
+    expected_train_record_count = len(train_queries) * len(configurations)
+    expected_test_record_count = len(test_queries) * len(configurations)
+
+    if train_record_count != expected_train_record_count:
+        raise ValueError(
+            "Train record count does not match the planned experiment: "
+            f"{train_record_count} != {expected_train_record_count}"
+        )
+
+    if test_record_count != expected_test_record_count:
+        raise ValueError(
+            "Test record count does not match the planned experiment: "
+            f"{test_record_count} != {expected_test_record_count}"
+        )
+
+    if (
+        manifest.status != "completed"
+        or manifest.train_record_count != train_record_count
+        or manifest.test_record_count != test_record_count
+    ):
+        manifest = complete_experiment_manifest(
+            manifest_path,
+            manifest,
+            completed_at=datetime.now(UTC),
+            train_record_count=train_record_count,
+            test_record_count=test_record_count,
+        )
     print("vLLM GPQA experiment completed")
     print(f"Cumulative train records: {len(train_records)}")
     print(f"Cumulative test records: {len(test_records)}")
     print(f"Train output: {train_output}")
     print(f"Test output: {test_output}")
+    print(f"Manifest: {manifest_path}")
 
 
 if __name__ == "__main__":
