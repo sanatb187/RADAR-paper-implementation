@@ -1,8 +1,12 @@
 import pytest
+import torch
 
 from radar_bench.metrics import (
     PerformanceCostPoint,
     build_performance_cost_points,
+    calculate_area_under_risk_coverage,
+    calculate_brier_score,
+    calculate_expected_calibration_error,
     calculate_hypervolume,
 )
 from radar_bench.routing_evaluation import RoutingEvaluation
@@ -134,3 +138,148 @@ def test_rejects_invalid_point(
         match="must be between 0 and 1",
     ):
         calculate_hypervolume([point])
+
+
+def test_calculates_brier_score() -> None:
+    predicted_probabilities = torch.tensor(
+        [
+            0.1,
+            0.4,
+            0.8,
+            0.9,
+        ]
+    )
+    targets = torch.tensor(
+        [
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+        ]
+    )
+
+    score = calculate_brier_score(
+        predicted_probabilities,
+        targets,
+    )
+
+    assert score == pytest.approx(0.055)
+
+
+def test_calculates_expected_calibration_error() -> None:
+    predicted_probabilities = torch.tensor(
+        [
+            0.1,
+            0.4,
+            0.8,
+            0.9,
+        ]
+    )
+    targets = torch.tensor(
+        [
+            0.0,
+            0.0,
+            1.0,
+            1.0,
+        ]
+    )
+
+    error = calculate_expected_calibration_error(
+        predicted_probabilities,
+        targets,
+        num_bins=2,
+    )
+
+    assert error == pytest.approx(0.2)
+
+
+def test_calibration_metrics_reject_shape_mismatch() -> None:
+    predicted_probabilities = torch.tensor([0.2, 0.8])
+    targets = torch.tensor([1.0])
+
+    with pytest.raises(
+        ValueError,
+        match="shapes must match",
+    ):
+        calculate_brier_score(
+            predicted_probabilities,
+            targets,
+        )
+
+    with pytest.raises(
+        ValueError,
+        match="shapes must match",
+    ):
+        calculate_expected_calibration_error(
+            predicted_probabilities,
+            targets,
+        )
+
+
+def test_expected_calibration_error_rejects_invalid_bin_count() -> None:
+    with pytest.raises(
+        ValueError,
+        match="num_bins must be positive",
+    ):
+        calculate_expected_calibration_error(
+            torch.tensor([0.5]),
+            torch.tensor([1.0]),
+            num_bins=0,
+        )
+
+
+def test_calculates_area_under_risk_coverage() -> None:
+    confidences = torch.tensor(
+        [
+            0.9,
+            0.8,
+            0.1,
+        ]
+    )
+    correct = torch.tensor(
+        [
+            1.0,
+            0.0,
+            0.0,
+        ]
+    )
+
+    area = calculate_area_under_risk_coverage(
+        confidences,
+        correct,
+    )
+
+    expected_area = (0.0 + 0.5 + (2.0 / 3.0)) / 3.0
+
+    assert area == pytest.approx(expected_area)
+
+
+def test_area_under_risk_coverage_rewards_correct_confidence_order() -> None:
+    correct = torch.tensor(
+        [
+            1.0,
+            0.0,
+        ]
+    )
+
+    correctly_ordered_area = calculate_area_under_risk_coverage(
+        torch.tensor([0.9, 0.1]),
+        correct,
+    )
+    incorrectly_ordered_area = calculate_area_under_risk_coverage(
+        torch.tensor([0.1, 0.9]),
+        correct,
+    )
+
+    assert correctly_ordered_area < incorrectly_ordered_area
+
+
+def test_area_under_risk_coverage_rejects_shape_mismatch() -> None:
+    with pytest.raises(
+        ValueError,
+        match="shapes must match",
+    ):
+        calculate_area_under_risk_coverage(
+            torch.tensor([0.2, 0.8]),
+            torch.tensor([1.0]),
+        )

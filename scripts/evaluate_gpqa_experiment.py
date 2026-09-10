@@ -98,6 +98,11 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Random seed for IRT training; defaults to --seed.",
     )
+    parser.add_argument(
+        "--calibration-bins",
+        type=int,
+        default=10,
+    )
 
     return parser.parse_args()
 
@@ -298,6 +303,7 @@ def main() -> None:
         batch_size=arguments.batch_size,
         max_gradient_norm=arguments.max_gradient_norm,
         scalarization=arguments.scalarization,
+        calibration_bins=arguments.calibration_bins,
         cost_metric=arguments.cost_metric,
         configurations=configurations,
         pricing_by_model_id=pricing_by_model_id,
@@ -312,6 +318,10 @@ def main() -> None:
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
     print(f"Test IRT loss: {report.test_irt_loss:.6f}")
+    print(f"Test Brier score: {report.test_brier_score:.6f}")
+    print(
+        f"Test expected calibration error: {report.test_expected_calibration_error:.6f}"
+    )
     print_irt_diagnostics(report)
     print_probability_variation(report)
     print_cost_diagnostics(report)
