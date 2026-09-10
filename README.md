@@ -176,6 +176,29 @@ Synthetic or proxy prices must not be presented as reproduced paper results.
 Generated datasets, model responses, checkpoints, and reports should not be
 committed to Git.
 
+## Preliminary results
+
+Two limited GPQA-Diamond pilots have been completed. These validate the
+generation and evaluation pipeline but do not constitute a reproduction of the
+paper's full GPQA-Diamond experiment.
+
+| Setup | Cost metric | Fixed frontier | RADAR frontier | Difference |
+|---|---:|---:|---:|---:|
+| Local Ollama | Latency | 0.466408 | 0.448391 | -0.018017 |
+| Local Ollama | Output tokens | 0.468787 | 0.469762 | +0.000975 |
+| Kaggle vLLM on NVIDIA T4 | Latency | 0.422298 | 0.374908 | -0.047390 |
+| Kaggle vLLM on NVIDIA T4 | Output tokens | 0.375000 | 0.375000 | +0.000000 |
+
+RADAR did not meaningfully outperform the fixed-configuration frontier in
+either pilot. The small output-token improvement in the local experiment is
+effectively a tie, while both latency evaluations favored the fixed frontier.
+
+These pilots differ from the paper in model coverage, training-set size,
+embedding model, quantization, and hardware. The remaining work is to complete
+the evaluation baselines, run one paper-aligned GPQA setup, compare it with the
+reported result, and document every deviation before considering Semantic
+Router integration.
+
 ## Development
 
 Run the test and lint checks with:
