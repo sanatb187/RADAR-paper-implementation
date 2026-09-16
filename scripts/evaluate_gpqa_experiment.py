@@ -1,5 +1,6 @@
 import argparse
 from collections.abc import Sequence
+from functools import partial
 from pathlib import Path
 
 from radar_bench.configurations import (
@@ -9,6 +10,10 @@ from radar_bench.cost import load_pricing_file
 from radar_bench.datasets.gpqa import (
     GPQA_REVISION,
     load_gpqa_diamond_splits,
+)
+from radar_bench.embeddings import (
+    DEFAULT_EMBEDDING_MODEL,
+    embed_queries,
 )
 from radar_bench.experiment import (
     load_evaluation_records,
@@ -97,6 +102,16 @@ def parse_arguments() -> argparse.Namespace:
         type=int,
         default=None,
         help="Random seed for IRT training; defaults to --seed.",
+    )
+    parser.add_argument(
+        "--calibration-bins",
+        type=int,
+        default=10,
+    )
+    parser.add_argument(
+        "--embedding-model",
+        default=DEFAULT_EMBEDDING_MODEL,
+        help="Ollama embedding model used by the IRT and classifier models.",
     )
 
     return parser.parse_args()
@@ -242,6 +257,8 @@ def print_hypervolume(
     report: RadarEvaluationReport,
 ) -> None:
     difference = report.radar_hypervolume - report.fixed_hypervolume
+    classifier_difference = report.classifier_hypervolume - report.fixed_hypervolume
+    random_pair_difference = report.random_pair_hypervolume - report.fixed_hypervolume
 
     print()
     print("Hypervolume")
@@ -249,6 +266,44 @@ def print_hypervolume(
     print(f"Fixed-configuration frontier: {report.fixed_hypervolume:.6f}")
     print(f"RADAR frontier: {report.radar_hypervolume:.6f}")
     print(f"RADAR difference: {difference:+.6f}")
+    print(f"Calibrated-classifier frontier: {report.classifier_hypervolume:.6f}")
+    print(f"Calibrated-classifier difference: {classifier_difference:+.6f}")
+    print(f"Random-Pair frontier: {report.random_pair_hypervolume:.6f}")
+    print(f"Random-Pair difference: {random_pair_difference:+.6f}")
+
+
+def _format_cpt(
+    cost_fraction: float | None,
+) -> str:
+    if cost_fraction is None:
+        return "unreachable"
+
+    return f"{cost_fraction:.4f} ({cost_fraction * 100:.2f}%)"
+
+
+def print_cpt(
+    report: RadarEvaluationReport,
+) -> None:
+    print()
+    print("Proxy CPT (90%)")
+    print("-" * 70)
+    print(f"Reference configuration: {report.cpt_reference_configuration_id}")
+    print(f"Reference accuracy: {report.cpt_reference_accuracy:.6f}")
+    print(f"Reference raw cost ({report.cost_metric}): {report.cpt_reference_cost:.6f}")
+    print(f"RADAR: {_format_cpt(report.radar_cpt_90)}")
+    print(f"Calibrated classifier: {_format_cpt(report.classifier_cpt_90)}")
+    print(f"Random-Pair: {_format_cpt(report.random_pair_cpt_90)}")
+
+
+def print_aurc(
+    report: RadarEvaluationReport,
+) -> None:
+    print()
+    print("Area under the risk-coverage curve")
+    print("-" * 70)
+
+    for strategy, area in report.aurc_by_strategy.items():
+        print(f"{strategy}: {area:.6f}")
 
 
 def main() -> None:
@@ -285,8 +340,11 @@ def main() -> None:
         splits.test,
         test_query_ids,
     )
-
     irt_seed = arguments.seed if arguments.irt_seed is None else arguments.irt_seed
+    embedding_function = partial(
+        embed_queries,
+        model=arguments.embedding_model,
+    )
     report = evaluate_radar_experiment(
         train_queries,
         test_queries,
@@ -298,20 +356,36 @@ def main() -> None:
         batch_size=arguments.batch_size,
         max_gradient_norm=arguments.max_gradient_norm,
         scalarization=arguments.scalarization,
+        embedding_function=embedding_function,
+        calibration_bins=arguments.calibration_bins,
         cost_metric=arguments.cost_metric,
         configurations=configurations,
         pricing_by_model_id=pricing_by_model_id,
         random_seed=irt_seed,
     )
+    classifier_difference = report.classifier_hypervolume - report.fixed_hypervolume
 
     print("RADAR evaluation completed")
     print(f"Train records: {len(train_records)}")
     print(f"Test records: {len(test_records)}")
     print(f"Routing cost metric: {report.cost_metric}")
+    print(f"Embedding model: {arguments.embedding_model}")
     print(f"IRT training seed: {irt_seed}")
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
     print(f"Test IRT loss: {report.test_irt_loss:.6f}")
+    print(f"Calibrated-classifier frontier: {report.classifier_hypervolume:.6f}")
+    print(f"Calibrated-classifier difference: {classifier_difference:+.6f}")
+    print(f"Test Brier score: {report.test_brier_score:.6f}")
+    print(f"Classifier test loss: {report.classifier_test_loss:.6f}")
+    print(f"Classifier test Brier score: {report.classifier_test_brier_score:.6f}")
+    print(
+        "Classifier test expected calibration error: "
+        f"{report.classifier_test_expected_calibration_error:.6f}"
+    )
+    print(
+        f"Test expected calibration error: {report.test_expected_calibration_error:.6f}"
+    )
     print_irt_diagnostics(report)
     print_probability_variation(report)
     print_cost_diagnostics(report)
@@ -324,6 +398,22 @@ def main() -> None:
     print_results(
         "Test fixed-configuration baselines",
         report.fixed_results,
+    )
+
+    print_results(
+        "Routing-sampling baselines",
+        report.routing_sampling_results,
+    )
+
+    print()
+    print("Random-Pair endpoints")
+    print("-" * 70)
+    print(f"Lower-cost configuration: {report.random_pair_lower_configuration_id}")
+    print(f"Upper-cost configuration: {report.random_pair_upper_configuration_id}")
+
+    print_results(
+        "Random-Pair runs",
+        report.random_pair_results,
     )
 
     print()
@@ -339,6 +429,10 @@ def main() -> None:
     )
 
     print_hypervolume(report)
+
+    print_cpt(report)
+
+    print_aurc(report)
 
     print_routing_diagnostics(
         report.radar_results,

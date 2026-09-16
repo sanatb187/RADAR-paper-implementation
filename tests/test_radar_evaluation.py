@@ -1,6 +1,7 @@
 import math
 from collections.abc import Sequence
 
+import pytest
 import torch
 
 from radar_bench.radar_evaluation import (
@@ -134,6 +135,7 @@ def test_evaluates_radar_experiment() -> None:
         train_records,
         test_records,
         performance_weights=(0.0, 1.0),
+        routing_sampling_seeds=(3, 7),
         num_epochs=20,
         embedding_function=fake_embeddings,
         random_seed=7,
@@ -141,6 +143,13 @@ def test_evaluates_radar_experiment() -> None:
 
     assert math.isfinite(report.test_irt_loss)
     assert report.test_irt_loss >= 0.0
+    assert 0.0 <= report.test_brier_score <= 1.0
+    assert 0.0 <= report.test_expected_calibration_error <= 1.0
+
+    assert math.isfinite(report.classifier_test_loss)
+    assert report.classifier_test_loss >= 0.0
+    assert 0.0 <= report.classifier_test_brier_score <= 1.0
+    assert 0.0 <= report.classifier_test_expected_calibration_error <= 1.0
 
     configuration_ids = {
         "config-a",
@@ -160,6 +169,7 @@ def test_evaluates_radar_experiment() -> None:
             math.isfinite(value) and 0.0 <= value <= 1.0
             for value in statistics.values()
         )
+
     assert len(report.training_loss_history) == 20
 
     assert report.normalized_costs == {
@@ -169,11 +179,61 @@ def test_evaluates_radar_experiment() -> None:
 
     assert len(report.fixed_results) == 2
     assert len(report.radar_results) == 2
+    assert len(report.classifier_results) == 2
+
+    assert tuple(result.strategy for result in report.classifier_results) == (
+        "calibrated-classifier:0",
+        "calibrated-classifier:1",
+    )
+    assert 0.0 <= report.classifier_hypervolume <= 1.0
+
+    assert tuple(result.strategy for result in report.routing_sampling_results) == (
+        "routing-sampling:3",
+        "routing-sampling:7",
+    )
+
+    assert report.random_pair_lower_configuration_id == "config-a"
+    assert report.random_pair_upper_configuration_id == "config-b"
+    assert tuple(result.strategy for result in report.random_pair_results) == (
+        "random-pair:0:seed-3",
+        "random-pair:0:seed-7",
+        "random-pair:1:seed-3",
+        "random-pair:1:seed-7",
+    )
+    assert 0.0 <= report.random_pair_hypervolume <= 1.0
+
+    assert report.cpt_reference_configuration_id == "config-b"
+    assert report.cpt_reference_accuracy == 0.5
+    assert report.cpt_reference_cost == 3.0
+
+    assert report.radar_cpt_90 == pytest.approx(1.0 / 3.0)
+    assert report.classifier_cpt_90 == pytest.approx(1.0 / 3.0)
+    assert report.random_pair_cpt_90 == pytest.approx(1.0 / 3.0)
+
+    expected_aurc_strategies = {
+        result.strategy
+        for results in (
+            report.fixed_results,
+            report.routing_sampling_results,
+            report.radar_results,
+            report.classifier_results,
+        )
+        for result in results
+    }
+
+    assert set(report.aurc_by_strategy) == expected_aurc_strategies
+    assert all(
+        math.isfinite(area) and 0.0 <= area <= 1.0
+        for area in report.aurc_by_strategy.values()
+    )
 
     lowest_cost_result = report.radar_results[0]
 
     assert lowest_cost_result.strategy == "radar:0"
-    assert lowest_cost_result.selected_configuration_ids == ("config-a", "config-a")
+    assert lowest_cost_result.selected_configuration_ids == (
+        "config-a",
+        "config-a",
+    )
     assert lowest_cost_result.accuracy == 0.5
     assert lowest_cost_result.average_latency_seconds == 1.0
 
@@ -183,6 +243,7 @@ def test_evaluates_radar_experiment() -> None:
         train_records,
         test_records,
         performance_weights=(0.0, 1.0),
+        routing_sampling_seeds=(3, 7),
         num_epochs=20,
         random_seed=7,
         embedding_function=fake_embeddings,
@@ -190,6 +251,24 @@ def test_evaluates_radar_experiment() -> None:
 
     assert repeated_report.training_loss_history == report.training_loss_history
     assert repeated_report.test_irt_loss == report.test_irt_loss
+    assert repeated_report.test_brier_score == report.test_brier_score
+    assert (
+        repeated_report.test_expected_calibration_error
+        == report.test_expected_calibration_error
+    )
+
+    assert repeated_report.classifier_test_loss == report.classifier_test_loss
+    assert (
+        repeated_report.classifier_test_brier_score
+        == report.classifier_test_brier_score
+    )
+    assert (
+        repeated_report.classifier_test_expected_calibration_error
+        == report.classifier_test_expected_calibration_error
+    )
+    assert repeated_report.classifier_results == report.classifier_results
+    assert repeated_report.classifier_hypervolume == report.classifier_hypervolume
+
     assert (
         repeated_report.test_mean_predicted_probabilities
         == report.test_mean_predicted_probabilities
@@ -199,3 +278,75 @@ def test_evaluates_radar_experiment() -> None:
         repeated_report.test_probability_standard_deviations
         == report.test_probability_standard_deviations
     )
+
+    assert repeated_report.routing_sampling_results == report.routing_sampling_results
+    assert repeated_report.random_pair_results == report.random_pair_results
+    assert (
+        repeated_report.random_pair_lower_configuration_id
+        == report.random_pair_lower_configuration_id
+    )
+    assert (
+        repeated_report.random_pair_upper_configuration_id
+        == report.random_pair_upper_configuration_id
+    )
+    assert repeated_report.random_pair_hypervolume == report.random_pair_hypervolume
+    assert (
+        repeated_report.cpt_reference_configuration_id
+        == report.cpt_reference_configuration_id
+    )
+    assert repeated_report.cpt_reference_accuracy == report.cpt_reference_accuracy
+    assert repeated_report.cpt_reference_cost == report.cpt_reference_cost
+    assert repeated_report.radar_cpt_90 == report.radar_cpt_90
+    assert repeated_report.classifier_cpt_90 == report.classifier_cpt_90
+    assert repeated_report.random_pair_cpt_90 == report.random_pair_cpt_90
+    assert repeated_report.aurc_by_strategy == report.aurc_by_strategy
+
+
+def test_rejects_empty_routing_sampling_seeds() -> None:
+    query = make_query("query-1", "test")
+    records = [
+        make_record(
+            "config-a",
+            query.query_id,
+            correct=True,
+            latency_seconds=1.0,
+        )
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match="routing_sampling_seeds cannot be empty",
+    ):
+        evaluate_radar_experiment(
+            [query],
+            [query],
+            records,
+            records,
+            routing_sampling_seeds=(),
+            embedding_function=fake_embeddings,
+        )
+
+
+def test_rejects_duplicate_routing_sampling_seeds() -> None:
+    query = make_query("query-1", "test")
+    records = [
+        make_record(
+            "config-a",
+            query.query_id,
+            correct=True,
+            latency_seconds=1.0,
+        )
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match="routing_sampling_seeds must be unique",
+    ):
+        evaluate_radar_experiment(
+            [query],
+            [query],
+            records,
+            records,
+            routing_sampling_seeds=(3, 3),
+            embedding_function=fake_embeddings,
+        )

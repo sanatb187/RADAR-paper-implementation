@@ -1,6 +1,7 @@
 from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from random import Random
 from typing import Literal
 
 import torch
@@ -116,17 +117,20 @@ def evaluate_radar_routing(
     *,
     performance_weight: float,
     scalarization: ScalarizationMethod = "linear",
+    strategy_prefix: str | None = None,
 ) -> RoutingEvaluation:
     """Evaluate RADAR selections against observed results."""
 
     if scalarization == "linear":
         selection_function = select_configuration
-        strategy_prefix = "radar"
+        default_strategy_prefix = "radar"
     elif scalarization == "chebyshev":
         selection_function = select_configuration_chebyshev
-        strategy_prefix = "radar-chebyshev"
+        default_strategy_prefix = "radar-chebyshev"
     else:
         raise ValueError(f"Unknown scalarization method: {scalarization}")
+
+    effective_strategy_prefix = strategy_prefix or default_strategy_prefix
 
     expected_shape = (
         len(response_matrix.configuration_ids),
@@ -174,10 +178,150 @@ def evaluate_radar_routing(
     query_count = len(response_matrix.query_ids)
 
     return RoutingEvaluation(
-        strategy=(f"{strategy_prefix}:{performance_weight:g}"),
+        strategy=f"{effective_strategy_prefix}:{performance_weight:g}",
         accuracy=correct_count / query_count,
         average_latency_seconds=(total_latency / query_count),
         selected_configuration_ids=tuple(selected_configuration_ids),
+    )
+
+
+def evaluate_routing_sampling(
+    response_matrix: ResponseMatrix,
+    evaluation_records: Sequence[EvaluationRecord],
+    *,
+    random_seed: int,
+) -> RoutingEvaluation:
+    """Evaluate uniform random configuration selection per query."""
+
+    if not response_matrix.configuration_ids:
+        raise ValueError("response matrix cannot contain zero configurations")
+
+    if not response_matrix.query_ids:
+        raise ValueError("response matrix cannot contain zero queries")
+
+    records_by_pair = _build_record_lookup(
+        response_matrix,
+        evaluation_records,
+    )
+
+    random_generator = Random(random_seed)
+
+    selected_configuration_ids = tuple(
+        random_generator.choice(response_matrix.configuration_ids)
+        for _ in response_matrix.query_ids
+    )
+
+    configuration_index = {
+        configuration_id: row
+        for row, configuration_id in enumerate(response_matrix.configuration_ids)
+    }
+
+    correct_count = 0
+    total_latency = 0.0
+
+    for column, (query_id, configuration_id) in enumerate(
+        zip(
+            response_matrix.query_ids,
+            selected_configuration_ids,
+            strict=True,
+        )
+    ):
+        row = configuration_index[configuration_id]
+        correct_count += int(response_matrix.values[row, column])
+        total_latency += records_by_pair[
+            (configuration_id, query_id)
+        ].generation.latency_seconds
+
+    query_count = len(response_matrix.query_ids)
+
+    return RoutingEvaluation(
+        strategy=f"routing-sampling:{random_seed}",
+        accuracy=correct_count / query_count,
+        average_latency_seconds=total_latency / query_count,
+        selected_configuration_ids=selected_configuration_ids,
+    )
+
+
+def evaluate_random_pair(
+    response_matrix: ResponseMatrix,
+    evaluation_records: Sequence[EvaluationRecord],
+    *,
+    lower_configuration_id: str,
+    upper_configuration_id: str,
+    upper_probability: float,
+    random_seed: int,
+) -> RoutingEvaluation:
+    """Randomly select between two endpoint configurations per query."""
+
+    if upper_probability < 0.0 or upper_probability > 1.0:
+        raise ValueError("upper_probability must be between 0 and 1")
+
+    if lower_configuration_id == upper_configuration_id:
+        raise ValueError("Random-Pair configurations must be different")
+
+    configuration_ids = set(response_matrix.configuration_ids)
+
+    missing_configuration_ids = sorted(
+        {
+            lower_configuration_id,
+            upper_configuration_id,
+        }
+        - configuration_ids
+    )
+
+    if missing_configuration_ids:
+        raise ValueError(
+            "Unknown Random-Pair configurations: "
+            + ", ".join(missing_configuration_ids)
+        )
+
+    if not response_matrix.query_ids:
+        raise ValueError("response matrix cannot contain zero queries")
+
+    records_by_pair = _build_record_lookup(
+        response_matrix,
+        evaluation_records,
+    )
+
+    random_generator = Random(random_seed)
+
+    selected_configuration_ids = tuple(
+        (
+            upper_configuration_id
+            if random_generator.random() < upper_probability
+            else lower_configuration_id
+        )
+        for _ in response_matrix.query_ids
+    )
+
+    configuration_index = {
+        configuration_id: row
+        for row, configuration_id in enumerate(response_matrix.configuration_ids)
+    }
+
+    correct_count = 0
+    total_latency = 0.0
+
+    for column, (query_id, configuration_id) in enumerate(
+        zip(
+            response_matrix.query_ids,
+            selected_configuration_ids,
+            strict=True,
+        )
+    ):
+        row = configuration_index[configuration_id]
+        correct_count += int(response_matrix.values[row, column])
+        total_latency += records_by_pair[
+            (configuration_id, query_id)
+        ].generation.latency_seconds
+
+    query_count = len(response_matrix.query_ids)
+
+    return RoutingEvaluation(
+        strategy=f"random-pair:{upper_probability:g}:seed-{random_seed}",
+        accuracy=correct_count / query_count,
+        average_latency_seconds=total_latency / query_count,
+        selected_configuration_ids=selected_configuration_ids,
     )
 
 
