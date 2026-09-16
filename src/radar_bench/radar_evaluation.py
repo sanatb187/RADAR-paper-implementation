@@ -13,9 +13,11 @@ from radar_bench.cost import (
 from radar_bench.embeddings import embed_queries
 from radar_bench.irt import train_irt_model
 from radar_bench.metrics import (
+    PerformanceCostPoint,
     build_performance_cost_points,
     calculate_area_under_risk_coverage,
     calculate_brier_score,
+    calculate_cost_at_performance_threshold,
     calculate_expected_calibration_error,
     calculate_hypervolume,
 )
@@ -28,6 +30,7 @@ from radar_bench.routing_evaluation import (
     compare_routing_results,
     evaluate_fixed_configurations,
     evaluate_radar_routing,
+    evaluate_random_pair,
     evaluate_routing_sampling,
     select_best_fixed_result,
 )
@@ -57,10 +60,19 @@ class RadarEvaluationReport:
     radar_results: tuple[RoutingEvaluation, ...]
     classifier_results: tuple[RoutingEvaluation, ...]
     routing_sampling_results: tuple[RoutingEvaluation, ...]
+    random_pair_results: tuple[RoutingEvaluation, ...]
+    random_pair_lower_configuration_id: str
+    random_pair_upper_configuration_id: str
     best_fixed_result: RoutingEvaluation
     train_oracle_accuracy: float
     test_oracle_accuracy: float
     radar_comparisons: tuple[PairedRoutingComparison, ...]
+    cpt_reference_configuration_id: str
+    cpt_reference_accuracy: float
+    cpt_reference_cost: float
+    radar_cpt_90: float | None
+    classifier_cpt_90: float | None
+    random_pair_cpt_90: float | None
     configuration_abilities: dict[str, float]
     classifier_test_loss: float
     classifier_test_brier_score: float
@@ -76,6 +88,7 @@ class RadarEvaluationReport:
     fixed_hypervolume: float
     radar_hypervolume: float
     classifier_hypervolume: float
+    random_pair_hypervolume: float
     train_probability_ranges: dict[str, float]
     test_probability_ranges: dict[str, float]
     train_probability_standard_deviations: dict[str, float]
@@ -390,6 +403,24 @@ def evaluate_radar_experiment(
     )
     normalized_costs = normalize_costs(costs)
 
+    if len(train_matrix.configuration_ids) < 2:
+        raise ValueError("Random-Pair requires at least two configurations")
+
+    random_pair_lower_configuration_id = min(
+        train_matrix.configuration_ids,
+        key=lambda configuration_id: (
+            normalized_costs[configuration_id],
+            configuration_id,
+        ),
+    )
+    random_pair_upper_configuration_id = max(
+        train_matrix.configuration_ids,
+        key=lambda configuration_id: (
+            normalized_costs[configuration_id],
+            configuration_id,
+        ),
+    )
+
     train_fixed_results = evaluate_fixed_configurations(
         train_matrix,
         train_records,
@@ -409,7 +440,39 @@ def evaluate_radar_experiment(
         for sampling_seed in routing_sampling_seeds
     )
 
+    random_pair_results = tuple(
+        evaluate_random_pair(
+            test_matrix,
+            test_records,
+            lower_configuration_id=random_pair_lower_configuration_id,
+            upper_configuration_id=random_pair_upper_configuration_id,
+            upper_probability=performance_weight,
+            random_seed=sampling_seed,
+        )
+        for performance_weight in performance_weights
+        for sampling_seed in routing_sampling_seeds
+    )
+
     best_fixed_result = select_best_fixed_result(fixed_results)
+
+    fixed_results_by_configuration_id = {
+        result.strategy.removeprefix("fixed:"): result for result in fixed_results
+    }
+
+    cpt_reference_configuration_id = random_pair_upper_configuration_id
+    cpt_reference_result = fixed_results_by_configuration_id[
+        cpt_reference_configuration_id
+    ]
+    cpt_reference_accuracy = cpt_reference_result.accuracy
+    cpt_reference_cost = costs[cpt_reference_configuration_id]
+
+    if cpt_reference_cost <= 0.0:
+        raise ValueError("CPT reference cost must be greater than zero")
+
+    cpt_cost_fractions = {
+        configuration_id: cost / cpt_reference_cost
+        for configuration_id, cost in costs.items()
+    }
 
     radar_results = tuple(
         evaluate_radar_routing(
@@ -423,16 +486,6 @@ def evaluate_radar_experiment(
         for performance_weight in performance_weights
     )
 
-    result = evaluate_radar_routing(
-        predicted_probabilities,
-        test_matrix,
-        test_records,
-        normalized_costs,
-        performance_weight=0.5,
-        strategy_prefix="calibrated-classifier",
-    )
-
-    assert result.strategy == "calibrated-classifier:0.5"
     classifier_strategy_prefix = "calibrated-classifier"
 
     if scalarization == "chebyshev":
@@ -483,9 +536,75 @@ def evaluate_radar_experiment(
         normalized_costs,
     )
 
+    random_pair_points = build_performance_cost_points(
+        random_pair_results,
+        normalized_costs,
+    )
+
+    seed_count = len(routing_sampling_seeds)
+
+    random_pair_mean_points = tuple(
+        PerformanceCostPoint(
+            strategy=f"random-pair:{performance_weight:g}",
+            accuracy=(sum(point.accuracy for point in weight_points) / seed_count),
+            normalized_cost=(
+                sum(point.normalized_cost for point in weight_points) / seed_count
+            ),
+        )
+        for weight_index, performance_weight in enumerate(performance_weights)
+        for weight_points in (
+            random_pair_points[
+                weight_index * seed_count : (weight_index + 1) * seed_count
+            ],
+        )
+    )
+
+    radar_cpt_points = build_performance_cost_points(
+        radar_results,
+        cpt_cost_fractions,
+    )
+    classifier_cpt_points = build_performance_cost_points(
+        classifier_results,
+        cpt_cost_fractions,
+    )
+    random_pair_cpt_seed_points = build_performance_cost_points(
+        random_pair_results,
+        cpt_cost_fractions,
+    )
+
+    random_pair_cpt_mean_points = tuple(
+        PerformanceCostPoint(
+            strategy=f"random-pair:{performance_weight:g}",
+            accuracy=(sum(point.accuracy for point in weight_points) / seed_count),
+            normalized_cost=(
+                sum(point.normalized_cost for point in weight_points) / seed_count
+            ),
+        )
+        for weight_index, performance_weight in enumerate(performance_weights)
+        for weight_points in (
+            random_pair_cpt_seed_points[
+                weight_index * seed_count : (weight_index + 1) * seed_count
+            ],
+        )
+    )
+
+    radar_cpt_90 = calculate_cost_at_performance_threshold(
+        radar_cpt_points,
+        reference_accuracy=cpt_reference_accuracy,
+    )
+    classifier_cpt_90 = calculate_cost_at_performance_threshold(
+        classifier_cpt_points,
+        reference_accuracy=cpt_reference_accuracy,
+    )
+    random_pair_cpt_90 = calculate_cost_at_performance_threshold(
+        random_pair_cpt_mean_points,
+        reference_accuracy=cpt_reference_accuracy,
+    )
+
     fixed_hypervolume = calculate_hypervolume(fixed_points)
     radar_hypervolume = calculate_hypervolume(radar_points)
     classifier_hypervolume = calculate_hypervolume(classifier_points)
+    random_pair_hypervolume = calculate_hypervolume(random_pair_mean_points)
     radar_comparisons = tuple(
         compare_routing_results(
             radar_result,
@@ -529,4 +648,14 @@ def evaluate_radar_experiment(
         aurc_by_strategy=aurc_by_strategy,
         fixed_hypervolume=fixed_hypervolume,
         radar_hypervolume=radar_hypervolume,
+        random_pair_results=random_pair_results,
+        random_pair_lower_configuration_id=(random_pair_lower_configuration_id),
+        random_pair_upper_configuration_id=(random_pair_upper_configuration_id),
+        random_pair_hypervolume=random_pair_hypervolume,
+        cpt_reference_configuration_id=cpt_reference_configuration_id,
+        cpt_reference_accuracy=cpt_reference_accuracy,
+        cpt_reference_cost=cpt_reference_cost,
+        radar_cpt_90=radar_cpt_90,
+        classifier_cpt_90=classifier_cpt_90,
+        random_pair_cpt_90=random_pair_cpt_90,
     )

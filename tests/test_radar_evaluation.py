@@ -185,13 +185,30 @@ def test_evaluates_radar_experiment() -> None:
         "calibrated-classifier:0",
         "calibrated-classifier:1",
     )
-
     assert 0.0 <= report.classifier_hypervolume <= 1.0
 
     assert tuple(result.strategy for result in report.routing_sampling_results) == (
         "routing-sampling:3",
         "routing-sampling:7",
     )
+
+    assert report.random_pair_lower_configuration_id == "config-a"
+    assert report.random_pair_upper_configuration_id == "config-b"
+    assert tuple(result.strategy for result in report.random_pair_results) == (
+        "random-pair:0:seed-3",
+        "random-pair:0:seed-7",
+        "random-pair:1:seed-3",
+        "random-pair:1:seed-7",
+    )
+    assert 0.0 <= report.random_pair_hypervolume <= 1.0
+
+    assert report.cpt_reference_configuration_id == "config-b"
+    assert report.cpt_reference_accuracy == 0.5
+    assert report.cpt_reference_cost == 3.0
+
+    assert report.radar_cpt_90 == pytest.approx(1.0 / 3.0)
+    assert report.classifier_cpt_90 == pytest.approx(1.0 / 3.0)
+    assert report.random_pair_cpt_90 == pytest.approx(1.0 / 3.0)
 
     expected_aurc_strategies = {
         result.strategy
@@ -261,8 +278,53 @@ def test_evaluates_radar_experiment() -> None:
         repeated_report.test_probability_standard_deviations
         == report.test_probability_standard_deviations
     )
+
     assert repeated_report.routing_sampling_results == report.routing_sampling_results
+    assert repeated_report.random_pair_results == report.random_pair_results
+    assert (
+        repeated_report.random_pair_lower_configuration_id
+        == report.random_pair_lower_configuration_id
+    )
+    assert (
+        repeated_report.random_pair_upper_configuration_id
+        == report.random_pair_upper_configuration_id
+    )
+    assert repeated_report.random_pair_hypervolume == report.random_pair_hypervolume
+    assert (
+        repeated_report.cpt_reference_configuration_id
+        == report.cpt_reference_configuration_id
+    )
+    assert repeated_report.cpt_reference_accuracy == report.cpt_reference_accuracy
+    assert repeated_report.cpt_reference_cost == report.cpt_reference_cost
+    assert repeated_report.radar_cpt_90 == report.radar_cpt_90
+    assert repeated_report.classifier_cpt_90 == report.classifier_cpt_90
+    assert repeated_report.random_pair_cpt_90 == report.random_pair_cpt_90
     assert repeated_report.aurc_by_strategy == report.aurc_by_strategy
+
+
+def test_rejects_empty_routing_sampling_seeds() -> None:
+    query = make_query("query-1", "test")
+    records = [
+        make_record(
+            "config-a",
+            query.query_id,
+            correct=True,
+            latency_seconds=1.0,
+        )
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match="routing_sampling_seeds cannot be empty",
+    ):
+        evaluate_radar_experiment(
+            [query],
+            [query],
+            records,
+            records,
+            routing_sampling_seeds=(),
+            embedding_function=fake_embeddings,
+        )
 
 
 def test_rejects_duplicate_routing_sampling_seeds() -> None:

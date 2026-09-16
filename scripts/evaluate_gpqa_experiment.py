@@ -247,6 +247,8 @@ def print_hypervolume(
     report: RadarEvaluationReport,
 ) -> None:
     difference = report.radar_hypervolume - report.fixed_hypervolume
+    classifier_difference = report.classifier_hypervolume - report.fixed_hypervolume
+    random_pair_difference = report.random_pair_hypervolume - report.fixed_hypervolume
 
     print()
     print("Hypervolume")
@@ -254,6 +256,44 @@ def print_hypervolume(
     print(f"Fixed-configuration frontier: {report.fixed_hypervolume:.6f}")
     print(f"RADAR frontier: {report.radar_hypervolume:.6f}")
     print(f"RADAR difference: {difference:+.6f}")
+    print(f"Calibrated-classifier frontier: {report.classifier_hypervolume:.6f}")
+    print(f"Calibrated-classifier difference: {classifier_difference:+.6f}")
+    print(f"Random-Pair frontier: {report.random_pair_hypervolume:.6f}")
+    print(f"Random-Pair difference: {random_pair_difference:+.6f}")
+
+
+def _format_cpt(
+    cost_fraction: float | None,
+) -> str:
+    if cost_fraction is None:
+        return "unreachable"
+
+    return f"{cost_fraction:.4f} ({cost_fraction * 100:.2f}%)"
+
+
+def print_cpt(
+    report: RadarEvaluationReport,
+) -> None:
+    print()
+    print("Proxy CPT (90%)")
+    print("-" * 70)
+    print(f"Reference configuration: {report.cpt_reference_configuration_id}")
+    print(f"Reference accuracy: {report.cpt_reference_accuracy:.6f}")
+    print(f"Reference raw cost ({report.cost_metric}): {report.cpt_reference_cost:.6f}")
+    print(f"RADAR: {_format_cpt(report.radar_cpt_90)}")
+    print(f"Calibrated classifier: {_format_cpt(report.classifier_cpt_90)}")
+    print(f"Random-Pair: {_format_cpt(report.random_pair_cpt_90)}")
+
+
+def print_aurc(
+    report: RadarEvaluationReport,
+) -> None:
+    print()
+    print("Area under the risk-coverage curve")
+    print("-" * 70)
+
+    for strategy, area in report.aurc_by_strategy.items():
+        print(f"{strategy}: {area:.6f}")
 
 
 def main() -> None:
@@ -290,7 +330,6 @@ def main() -> None:
         splits.test,
         test_query_ids,
     )
-
     irt_seed = arguments.seed if arguments.irt_seed is None else arguments.irt_seed
     report = evaluate_radar_experiment(
         train_queries,
@@ -309,6 +348,7 @@ def main() -> None:
         pricing_by_model_id=pricing_by_model_id,
         random_seed=irt_seed,
     )
+    classifier_difference = report.classifier_hypervolume - report.fixed_hypervolume
 
     print("RADAR evaluation completed")
     print(f"Train records: {len(train_records)}")
@@ -318,7 +358,15 @@ def main() -> None:
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
     print(f"Test IRT loss: {report.test_irt_loss:.6f}")
+    print(f"Calibrated-classifier frontier: {report.classifier_hypervolume:.6f}")
+    print(f"Calibrated-classifier difference: {classifier_difference:+.6f}")
     print(f"Test Brier score: {report.test_brier_score:.6f}")
+    print(f"Classifier test loss: {report.classifier_test_loss:.6f}")
+    print(f"Classifier test Brier score: {report.classifier_test_brier_score:.6f}")
+    print(
+        "Classifier test expected calibration error: "
+        f"{report.classifier_test_expected_calibration_error:.6f}"
+    )
     print(
         f"Test expected calibration error: {report.test_expected_calibration_error:.6f}"
     )
@@ -336,6 +384,22 @@ def main() -> None:
         report.fixed_results,
     )
 
+    print_results(
+        "Routing-sampling baselines",
+        report.routing_sampling_results,
+    )
+
+    print()
+    print("Random-Pair endpoints")
+    print("-" * 70)
+    print(f"Lower-cost configuration: {report.random_pair_lower_configuration_id}")
+    print(f"Upper-cost configuration: {report.random_pair_upper_configuration_id}")
+
+    print_results(
+        "Random-Pair runs",
+        report.random_pair_results,
+    )
+
     print()
     print("Oracle upper bounds")
     print("-" * 70)
@@ -349,6 +413,10 @@ def main() -> None:
     )
 
     print_hypervolume(report)
+
+    print_cpt(report)
+
+    print_aurc(report)
 
     print_routing_diagnostics(
         report.radar_results,

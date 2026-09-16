@@ -9,6 +9,7 @@ from radar_bench.routing_evaluation import (
     count_configuration_selections,
     evaluate_fixed_configurations,
     evaluate_radar_routing,
+    evaluate_random_pair,
     evaluate_routing_sampling,
     select_best_fixed_result,
 )
@@ -350,29 +351,126 @@ def test_routing_sampling_uses_observed_configuration_results() -> None:
     assert result.accuracy == expected_correct_count / len(matrix.query_ids)
     assert result.average_latency_seconds == expected_latency
 
-    def test_routing_supports_custom_strategy_prefix() -> None:
-        records = make_records()
-        matrix = ResponseMatrix.from_records(records)
 
-        result = evaluate_radar_routing(
-            torch.tensor(
-                [
-                    [0.9, 0.1],
-                    [0.1, 0.9],
-                ]
-            ),
+def test_routing_supports_custom_strategy_prefix() -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    result = evaluate_radar_routing(
+        torch.tensor(
+            [
+                [0.9, 0.1],
+                [0.1, 0.9],
+            ]
+        ),
+        matrix,
+        records,
+        {
+            "config-a": 0.0,
+            "config-b": 1.0,
+        },
+        performance_weight=1.0,
+        strategy_prefix="classifier",
+    )
+
+    assert result.strategy == "classifier:1"
+    assert result.selected_configuration_ids == (
+        "config-a",
+        "config-b",
+    )
+
+
+def test_random_pair_selects_lower_endpoint_at_zero_probability() -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    result = evaluate_random_pair(
+        matrix,
+        records,
+        lower_configuration_id="config-a",
+        upper_configuration_id="config-b",
+        upper_probability=0.0,
+        random_seed=17,
+    )
+
+    assert result.strategy == "random-pair:0:seed-17"
+    assert result.selected_configuration_ids == (
+        "config-a",
+        "config-a",
+    )
+    assert result.accuracy == 0.5
+    assert result.average_latency_seconds == 1.0
+
+
+def test_random_pair_selects_upper_endpoint_at_one_probability() -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    result = evaluate_random_pair(
+        matrix,
+        records,
+        lower_configuration_id="config-a",
+        upper_configuration_id="config-b",
+        upper_probability=1.0,
+        random_seed=17,
+    )
+
+    assert result.strategy == "random-pair:1:seed-17"
+    assert result.selected_configuration_ids == (
+        "config-b",
+        "config-b",
+    )
+    assert result.accuracy == 0.5
+    assert result.average_latency_seconds == 3.0
+
+
+def test_random_pair_is_reproducible() -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    first_result = evaluate_random_pair(
+        matrix,
+        records,
+        lower_configuration_id="config-a",
+        upper_configuration_id="config-b",
+        upper_probability=0.5,
+        random_seed=17,
+    )
+    second_result = evaluate_random_pair(
+        matrix,
+        records,
+        lower_configuration_id="config-a",
+        upper_configuration_id="config-b",
+        upper_probability=0.5,
+        random_seed=17,
+    )
+
+    assert first_result == second_result
+    assert set(first_result.selected_configuration_ids) <= {
+        "config-a",
+        "config-b",
+    }
+
+
+@pytest.mark.parametrize(
+    "upper_probability",
+    [-0.1, 1.1],
+)
+def test_random_pair_rejects_invalid_probability(
+    upper_probability: float,
+) -> None:
+    records = make_records()
+    matrix = ResponseMatrix.from_records(records)
+
+    with pytest.raises(
+        ValueError,
+        match="upper_probability must be between 0 and 1",
+    ):
+        evaluate_random_pair(
             matrix,
             records,
-            {
-                "config-a": 0.0,
-                "config-b": 1.0,
-            },
-            performance_weight=1.0,
-            strategy_prefix="classifier",
-        )
-
-        assert result.strategy == "classifier:1"
-        assert result.selected_configuration_ids == (
-            "config-a",
-            "config-b",
+            lower_configuration_id="config-a",
+            upper_configuration_id="config-b",
+            upper_probability=upper_probability,
+            random_seed=17,
         )

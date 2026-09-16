@@ -101,6 +101,48 @@ def calculate_expected_calibration_error(
     return calibration_error
 
 
+def calculate_cost_at_performance_threshold(
+    points: Sequence[PerformanceCostPoint],
+    *,
+    reference_accuracy: float,
+    performance_fraction: float = 0.9,
+) -> float | None:
+    """
+    Return the lowest reference-relative cost that reaches the target accuracy.
+
+    Point costs must be expressed as fractions of the reference configuration's
+    raw cost. A return value of 0.25 therefore means 25% of the reference cost.
+    """
+
+    if not points:
+        raise ValueError("points cannot be empty")
+
+    if reference_accuracy <= 0.0 or reference_accuracy > 1.0:
+        raise ValueError("reference_accuracy must be greater than 0 and at most 1")
+
+    if performance_fraction <= 0.0 or performance_fraction > 1.0:
+        raise ValueError("performance_fraction must be greater than 0 and at most 1")
+
+    if any(point.accuracy < 0.0 or point.accuracy > 1.0 for point in points):
+        raise ValueError("Point accuracy must be between 0 and 1")
+
+    if any(point.normalized_cost < 0.0 for point in points):
+        raise ValueError("Point cost cannot be negative")
+
+    target_accuracy = reference_accuracy * performance_fraction
+
+    qualifying_costs = [
+        point.normalized_cost
+        for point in points
+        if point.accuracy + 1e-12 >= target_accuracy
+    ]
+
+    if not qualifying_costs:
+        return None
+
+    return min(qualifying_costs)
+
+
 def build_performance_cost_points(
     results: Sequence[RoutingEvaluation],
     normalized_costs: Mapping[str, float],

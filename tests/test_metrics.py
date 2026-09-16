@@ -6,6 +6,7 @@ from radar_bench.metrics import (
     build_performance_cost_points,
     calculate_area_under_risk_coverage,
     calculate_brier_score,
+    calculate_cost_at_performance_threshold,
     calculate_expected_calibration_error,
     calculate_hypervolume,
 )
@@ -283,3 +284,77 @@ def test_area_under_risk_coverage_rejects_shape_mismatch() -> None:
             torch.tensor([0.2, 0.8]),
             torch.tensor([1.0]),
         )
+
+
+def test_calculates_cost_at_performance_threshold() -> None:
+    points = [
+        PerformanceCostPoint(
+            strategy="low-cost",
+            accuracy=0.70,
+            normalized_cost=0.10,
+        ),
+        PerformanceCostPoint(
+            strategy="qualified",
+            accuracy=0.81,
+            normalized_cost=0.25,
+        ),
+        PerformanceCostPoint(
+            strategy="expensive",
+            accuracy=0.90,
+            normalized_cost=1.00,
+        ),
+    ]
+
+    cost_fraction = calculate_cost_at_performance_threshold(
+        points,
+        reference_accuracy=0.90,
+        performance_fraction=0.90,
+    )
+
+    assert cost_fraction == pytest.approx(0.25)
+
+
+def test_cost_at_performance_threshold_selects_lowest_qualifying_cost() -> None:
+    points = [
+        PerformanceCostPoint(
+            strategy="expensive",
+            accuracy=0.90,
+            normalized_cost=0.80,
+        ),
+        PerformanceCostPoint(
+            strategy="cheaper",
+            accuracy=0.82,
+            normalized_cost=0.30,
+        ),
+        PerformanceCostPoint(
+            strategy="cheapest",
+            accuracy=0.81,
+            normalized_cost=0.20,
+        ),
+    ]
+
+    cost_fraction = calculate_cost_at_performance_threshold(
+        points,
+        reference_accuracy=0.90,
+        performance_fraction=0.90,
+    )
+
+    assert cost_fraction == pytest.approx(0.20)
+
+
+def test_cost_at_performance_threshold_returns_none_when_unreachable() -> None:
+    points = [
+        PerformanceCostPoint(
+            strategy="insufficient",
+            accuracy=0.79,
+            normalized_cost=0.10,
+        )
+    ]
+
+    cost_fraction = calculate_cost_at_performance_threshold(
+        points,
+        reference_accuracy=0.90,
+        performance_fraction=0.90,
+    )
+
+    assert cost_fraction is None
