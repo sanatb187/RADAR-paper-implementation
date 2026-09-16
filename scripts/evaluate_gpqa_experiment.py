@@ -1,5 +1,6 @@
 import argparse
 from collections.abc import Sequence
+from functools import partial
 from pathlib import Path
 
 from radar_bench.configurations import (
@@ -9,6 +10,10 @@ from radar_bench.cost import load_pricing_file
 from radar_bench.datasets.gpqa import (
     GPQA_REVISION,
     load_gpqa_diamond_splits,
+)
+from radar_bench.embeddings import (
+    DEFAULT_EMBEDDING_MODEL,
+    embed_queries,
 )
 from radar_bench.experiment import (
     load_evaluation_records,
@@ -102,6 +107,11 @@ def parse_arguments() -> argparse.Namespace:
         "--calibration-bins",
         type=int,
         default=10,
+    )
+    parser.add_argument(
+        "--embedding-model",
+        default=DEFAULT_EMBEDDING_MODEL,
+        help="Ollama embedding model used by the IRT and classifier models.",
     )
 
     return parser.parse_args()
@@ -331,6 +341,10 @@ def main() -> None:
         test_query_ids,
     )
     irt_seed = arguments.seed if arguments.irt_seed is None else arguments.irt_seed
+    embedding_function = partial(
+        embed_queries,
+        model=arguments.embedding_model,
+    )
     report = evaluate_radar_experiment(
         train_queries,
         test_queries,
@@ -342,6 +356,7 @@ def main() -> None:
         batch_size=arguments.batch_size,
         max_gradient_norm=arguments.max_gradient_norm,
         scalarization=arguments.scalarization,
+        embedding_function=embedding_function,
         calibration_bins=arguments.calibration_bins,
         cost_metric=arguments.cost_metric,
         configurations=configurations,
@@ -354,6 +369,7 @@ def main() -> None:
     print(f"Train records: {len(train_records)}")
     print(f"Test records: {len(test_records)}")
     print(f"Routing cost metric: {report.cost_metric}")
+    print(f"Embedding model: {arguments.embedding_model}")
     print(f"IRT training seed: {irt_seed}")
     print(f"Initial IRT loss: {report.training_loss_history[0]:.6f}")
     print(f"Final IRT loss: {report.training_loss_history[-1]:.6f}")
