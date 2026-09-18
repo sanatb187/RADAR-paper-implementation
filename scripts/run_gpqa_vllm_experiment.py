@@ -14,6 +14,7 @@ from radar_bench.datasets.gpqa import (
     GPQA_DIAMOND_CONFIG,
     GPQA_REVISION,
     load_gpqa_diamond_splits,
+    load_gpqa_splits,
 )
 from radar_bench.experiment import (
     run_gpqa_experiment,
@@ -108,6 +109,11 @@ def parse_arguments() -> argparse.Namespace:
         action="store_true",
         help="Record that the experiment used an uncommitted working tree.",
     )
+    parser.add_argument(
+        "--paper-split",
+        action="store_true",
+        help="Train on non-Diamond GPQA Main and test on full Diamond.",
+    )
     return parser.parse_args()
 
 
@@ -180,10 +186,16 @@ def main() -> None:
 
     base_url = arguments.base_url.rstrip("/")
 
-    splits = load_gpqa_diamond_splits(
+    split_loader = (
+        load_gpqa_splits if arguments.paper_split else load_gpqa_diamond_splits
+    )
+
+    splits = split_loader(
         seed=arguments.seed,
         revision=arguments.revision,
     )
+
+    split_name = "paper-split" if arguments.paper_split else "diamond-split"
 
     train_queries = select_query_subset(
         splits.train,
@@ -197,7 +209,7 @@ def main() -> None:
     )
 
     experiment_directory = arguments.output_dir / (
-        f"diamond-split_revision-{arguments.revision[:12]}_seed-{arguments.seed}"
+        f"{split_name}_revision-{arguments.revision[:12]}_seed-{arguments.seed}"
     )
 
     train_output = experiment_directory / f"train_n-{arguments.train_count}.jsonl"
