@@ -21,13 +21,13 @@ outside the current scope.
 
 ```text
 radar-bench/
-├── configs/              # Versioned experiment configurations
-├── src/
-│   └── radar_bench/      # Installable Python package
-├── tests/                # Unit and integration tests
-├── README.md
-├── pyproject.toml
-└── uv.lock
+â”œâ”€â”€ configs/              # Versioned experiment configurations
+â”œâ”€â”€ src/
+â”‚   â””â”€â”€ radar_bench/      # Installable Python package
+â”œâ”€â”€ tests/                # Unit and integration tests
+â”œâ”€â”€ README.md
+â”œâ”€â”€ pyproject.toml
+â””â”€â”€ uv.lock
 ```
 
 ## Installation
@@ -52,9 +52,14 @@ Because the project uses a `src` layout, run development commands through
 
 ## Reproducing the benchmark
 
-GPQA-Diamond is the initial reproduction target. The loader uses the pinned
-dataset revision and creates a deterministic train/test split from the 198
-Diamond questions.
+GPQA-Diamond is the initial reproduction target. Two dataset layouts are
+supported:
+
+- A deterministic split of the 198 Diamond questions for small local pilots.
+- A paper-aligned split using GPQA Main excluding Diamond for training
+  (250 questions) and full GPQA-Diamond for testing (198 questions).
+
+Both loaders use the pinned dataset revision and deterministic choice ordering.
 
 Before running an experiment:
 
@@ -176,28 +181,47 @@ Synthetic or proxy prices must not be presented as reproduced paper results.
 Generated datasets, model responses, checkpoints, and reports should not be
 committed to Git.
 
-## Preliminary results
+## Reproduction results
 
-Two limited GPQA-Diamond pilots have been completed. These validate the
-generation and evaluation pipeline but do not constitute a reproduction of the
-paper's full GPQA-Diamond experiment.
+Two evaluation setups were completed.
 
 | Setup | Cost metric | Fixed frontier | RADAR frontier | Difference |
 |---|---:|---:|---:|---:|
-| Local Ollama | Latency | 0.466408 | 0.448391 | -0.018017 |
-| Local Ollama | Output tokens | 0.468787 | 0.469762 | +0.000975 |
-| Kaggle vLLM on NVIDIA T4 | Latency | 0.422298 | 0.374908 | -0.047390 |
-| Kaggle vLLM on NVIDIA T4 | Output tokens | 0.375000 | 0.375000 | +0.000000 |
+| Local Ollama pilot (64 train / 32 test) | Latency | 0.466408 | 0.448391 | -0.018017 |
+| Local Ollama pilot (64 train / 32 test) | Output tokens | 0.468787 | 0.469762 | +0.000975 |
+| Paper-aligned GPQA split (250 train / 198 test) | Output tokens | 0.347359 | 0.330996 | -0.016363 |
 
-RADAR did not meaningfully outperform the fixed-configuration frontier in
-either pilot. The small output-token improvement in the local experiment is
-effectively a tie, while both latency evaluations favored the fixed frontier.
+The paper-aligned experiment used GPQA Main excluding Diamond for training and
+the full GPQA-Diamond dataset for testing. It evaluated Qwen3 4B/8B AWQ models
+with reasoning budgets of 0, 256, and 1024 tokens. Generations ran through vLLM
+on NVIDIA T4 GPUs, while routing used Qwen3-Embedding-8B and Chebyshev
+scalarization.
 
-These pilots differ from the paper in model coverage, training-set size,
-embedding model, quantization, and hardware. The remaining work is to complete
-the evaluation baselines, run one paper-aligned GPQA setup, compare it with the
-reported result, and document every deviation before considering Semantic
-Router integration.
+Results from the paper-aligned experiment:
+
+| Metric | Result |
+|---|---:|
+| Best fixed accuracy | 0.419 |
+| Best RADAR accuracy | 0.338 |
+| Oracle accuracy | 0.682 |
+| Fixed frontier | 0.347359 |
+| RADAR frontier | 0.330996 |
+| RADAR difference from fixed | -0.016363 |
+| Calibrated-classifier frontier | 0.352483 |
+| Calibrated-classifier difference from fixed | +0.005124 |
+| IRT training loss | 0.394328 |
+| IRT test loss | 0.699372 |
+
+The oracle upper bound shows substantial complementarity among the
+configurations, but the learned IRT probabilities did not generalize. RADAR
+did not outperform the fixed frontier, while the simpler calibrated classifier
+slightly did.
+
+This is a scoped reproduction rather than the paper's complete experimental
+suite. It uses one benchmark, six self-hosted AWQ configurations, and
+output-token cost instead of provider pricing. These deviations prevent a
+direct comparison with the paper's reported absolute improvement and do not
+support Semantic Router runtime integration at this stage.
 
 ## Development
 
@@ -216,6 +240,6 @@ uv run mypy src
 - [x] Review and document the paper's experimental setup
 - [x] Implement the RADAR formulation
 - [x] Implement a reproducible GPQA-Diamond local pilot
-- [ ] Reproduce the full GPQA-Diamond experiment
-- [ ] Compare the reproduced results with the paper
-- [ ] Document deviations and findings
+- [x] Run one paper-aligned GPQA experiment
+- [x] Compare the reproduced results with the paper
+- [x] Document deviations and findings
