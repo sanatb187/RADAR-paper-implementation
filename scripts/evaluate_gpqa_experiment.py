@@ -10,6 +10,7 @@ from radar_bench.cost import load_pricing_file
 from radar_bench.datasets.gpqa import (
     GPQA_REVISION,
     load_gpqa_diamond_splits,
+    load_gpqa_splits,
 )
 from radar_bench.embeddings import (
     DEFAULT_EMBEDDING_MODEL,
@@ -112,6 +113,11 @@ def parse_arguments() -> argparse.Namespace:
         "--embedding-model",
         default=DEFAULT_EMBEDDING_MODEL,
         help="Ollama embedding model used by the IRT and classifier models.",
+    )
+    parser.add_argument(
+        "--paper-split",
+        action="store_true",
+        help="Use GPQA Main minus Diamond for training and full Diamond for test.",
     )
 
     return parser.parse_args()
@@ -324,7 +330,11 @@ def main() -> None:
     train_records = load_evaluation_records(arguments.train_records)
     test_records = load_evaluation_records(arguments.test_records)
 
-    splits = load_gpqa_diamond_splits(
+    split_loader = (
+        load_gpqa_splits if arguments.paper_split else load_gpqa_diamond_splits
+    )
+
+    splits = split_loader(
         seed=arguments.seed,
         revision=arguments.revision,
     )
