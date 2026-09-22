@@ -185,6 +185,10 @@ committed to Git.
 
 Two evaluation setups were completed.
 
+Completed run manifests and the full evaluator output, including calibration and
+risk-coverage results, are available in
+[`reproductions/gpqa-paper-aligned`](reproductions/gpqa-paper-aligned).
+
 | Setup | Cost metric | Fixed frontier | RADAR frontier | Difference |
 |---|---:|---:|---:|---:|
 | Local Ollama pilot (64 train / 32 test) | Latency | 0.466408 | 0.448391 | -0.018017 |
