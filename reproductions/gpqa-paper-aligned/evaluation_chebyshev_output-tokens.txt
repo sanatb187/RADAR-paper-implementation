@@ -1,0 +1,247 @@
+RADAR evaluation completed
+Train records: 1500
+Test records: 1188
+Routing cost metric: output-tokens
+Embedding model: qwen3-embedding:8b
+IRT training seed: 42
+Initial IRT loss: 0.693381
+Final IRT loss: 0.394328
+Test IRT loss: 0.699372
+Calibrated-classifier frontier: 0.352483
+Calibrated-classifier difference: +0.005124
+Test Brier score: 0.240454
+Classifier test loss: 0.648067
+Classifier test Brier score: 0.227512
+Classifier test expected calibration error: 0.028726
+Test expected calibration error: 0.120617
+
+IRT diagnostics
+configuration | ability | train observed | train predicted | test observed | test predicted
+--------------------------------------------------------------------------------------------------------------
+qwen3-4b-awq__tokens-0 | 0.251 | 0.356 | 0.372 | 0.308 | 0.318
+qwen3-4b-awq__tokens-1024 | 0.276 | 0.332 | 0.372 | 0.419 | 0.318
+qwen3-4b-awq__tokens-256 | 0.325 | 0.340 | 0.371 | 0.343 | 0.316
+qwen3-8b-awq__tokens-0 | 0.091 | 0.408 | 0.375 | 0.343 | 0.323
+qwen3-8b-awq__tokens-1024 | 0.066 | 0.392 | 0.375 | 0.384 | 0.324
+qwen3-8b-awq__tokens-256 | 0.057 | 0.420 | 0.375 | 0.348 | 0.324
+
+Negative discrimination fraction: train=0.684, test=0.788
+
+Predicted probability variation
+configuration | train range | train std | test range | test std
+------------------------------------------------------------------------------------------
+qwen3-4b-awq__tokens-0 | 0.961717 | 0.284278 | 0.816142 | 0.197848
+qwen3-4b-awq__tokens-1024 | 0.962609 | 0.285316 | 0.817946 | 0.198599
+qwen3-4b-awq__tokens-256 | 0.964378 | 0.287423 | 0.821605 | 0.200129
+qwen3-8b-awq__tokens-0 | 0.955214 | 0.277143 | 0.803690 | 0.192720
+qwen3-8b-awq__tokens-1024 | 0.954106 | 0.275995 | 0.801680 | 0.191901
+qwen3-8b-awq__tokens-256 | 0.953703 | 0.275583 | 0.800957 | 0.191607
+
+Normalized routing costs (output-tokens)
+configuration | normalized cost
+----------------------------------------------------------------------
+qwen3-4b-awq__tokens-0 | 0.000000
+qwen3-4b-awq__tokens-1024 | 0.998058
+qwen3-4b-awq__tokens-256 | 0.250120
+qwen3-8b-awq__tokens-0 | 0.000000
+qwen3-8b-awq__tokens-1024 | 1.000000
+qwen3-8b-awq__tokens-256 | 0.250120
+
+Training fixed-configuration results
+strategy | accuracy | average latency
+----------------------------------------------------------------------
+fixed:qwen3-4b-awq__tokens-0 | 0.356 | 0.194s
+fixed:qwen3-4b-awq__tokens-1024 | 0.332 | 20.773s
+fixed:qwen3-4b-awq__tokens-256 | 0.340 | 4.963s
+fixed:qwen3-8b-awq__tokens-0 | 0.408 | 0.286s
+fixed:qwen3-8b-awq__tokens-1024 | 0.392 | 33.621s
+fixed:qwen3-8b-awq__tokens-256 | 0.420 | 8.416s
+
+Test fixed-configuration baselines
+strategy | accuracy | average latency
+----------------------------------------------------------------------
+fixed:qwen3-4b-awq__tokens-0 | 0.308 | 0.207s
+fixed:qwen3-4b-awq__tokens-1024 | 0.419 | 19.639s
+fixed:qwen3-4b-awq__tokens-256 | 0.343 | 4.673s
+fixed:qwen3-8b-awq__tokens-0 | 0.343 | 0.300s
+fixed:qwen3-8b-awq__tokens-1024 | 0.384 | 32.305s
+fixed:qwen3-8b-awq__tokens-256 | 0.348 | 7.908s
+
+Routing-sampling baselines
+strategy | accuracy | average latency
+----------------------------------------------------------------------
+routing-sampling:0 | 0.364 | 11.427s
+routing-sampling:1 | 0.379 | 11.574s
+routing-sampling:2 | 0.354 | 11.557s
+routing-sampling:3 | 0.338 | 11.253s
+routing-sampling:4 | 0.384 | 9.927s
+routing-sampling:5 | 0.338 | 10.218s
+routing-sampling:6 | 0.394 | 10.767s
+routing-sampling:7 | 0.338 | 11.070s
+routing-sampling:8 | 0.384 | 10.600s
+routing-sampling:9 | 0.348 | 10.817s
+
+Random-Pair endpoints
+----------------------------------------------------------------------
+Lower-cost configuration: qwen3-4b-awq__tokens-0
+Upper-cost configuration: qwen3-8b-awq__tokens-1024
+
+Random-Pair runs
+strategy | accuracy | average latency
+----------------------------------------------------------------------
+random-pair:0:seed-0 | 0.308 | 0.207s
+random-pair:0:seed-1 | 0.308 | 0.207s
+random-pair:0:seed-2 | 0.308 | 0.207s
+random-pair:0:seed-3 | 0.308 | 0.207s
+random-pair:0:seed-4 | 0.308 | 0.207s
+random-pair:0:seed-5 | 0.308 | 0.207s
+random-pair:0:seed-6 | 0.308 | 0.207s
+random-pair:0:seed-7 | 0.308 | 0.207s
+random-pair:0:seed-8 | 0.308 | 0.207s
+random-pair:0:seed-9 | 0.308 | 0.207s
+random-pair:0.25:seed-0 | 0.313 | 6.668s
+random-pair:0.25:seed-1 | 0.328 | 8.956s
+random-pair:0.25:seed-2 | 0.333 | 9.133s
+random-pair:0.25:seed-3 | 0.328 | 7.065s
+random-pair:0.25:seed-4 | 0.323 | 10.058s
+random-pair:0.25:seed-5 | 0.318 | 7.324s
+random-pair:0.25:seed-6 | 0.333 | 7.167s
+random-pair:0.25:seed-7 | 0.343 | 9.986s
+random-pair:0.25:seed-8 | 0.354 | 8.930s
+random-pair:0.25:seed-9 | 0.328 | 9.961s
+random-pair:0.5:seed-0 | 0.354 | 15.080s
+random-pair:0.5:seed-1 | 0.348 | 16.216s
+random-pair:0.5:seed-2 | 0.348 | 16.100s
+random-pair:0.5:seed-3 | 0.323 | 15.472s
+random-pair:0.5:seed-4 | 0.364 | 16.705s
+random-pair:0.5:seed-5 | 0.313 | 14.796s
+random-pair:0.5:seed-6 | 0.379 | 16.411s
+random-pair:0.5:seed-7 | 0.369 | 18.090s
+random-pair:0.5:seed-8 | 0.384 | 17.202s
+random-pair:0.5:seed-9 | 0.369 | 16.925s
+random-pair:0.75:seed-0 | 0.384 | 23.882s
+random-pair:0.75:seed-1 | 0.369 | 24.699s
+random-pair:0.75:seed-2 | 0.384 | 24.968s
+random-pair:0.75:seed-3 | 0.369 | 24.079s
+random-pair:0.75:seed-4 | 0.364 | 22.915s
+random-pair:0.75:seed-5 | 0.328 | 22.561s
+random-pair:0.75:seed-6 | 0.364 | 22.928s
+random-pair:0.75:seed-7 | 0.379 | 24.691s
+random-pair:0.75:seed-8 | 0.394 | 24.869s
+random-pair:0.75:seed-9 | 0.374 | 25.661s
+random-pair:1:seed-0 | 0.384 | 32.305s
+random-pair:1:seed-1 | 0.384 | 32.305s
+random-pair:1:seed-2 | 0.384 | 32.305s
+random-pair:1:seed-3 | 0.384 | 32.305s
+random-pair:1:seed-4 | 0.384 | 32.305s
+random-pair:1:seed-5 | 0.384 | 32.305s
+random-pair:1:seed-6 | 0.384 | 32.305s
+random-pair:1:seed-7 | 0.384 | 32.305s
+random-pair:1:seed-8 | 0.384 | 32.305s
+random-pair:1:seed-9 | 0.384 | 32.305s
+
+Oracle upper bounds
+----------------------------------------------------------------------
+Train oracle accuracy: 0.640
+Test oracle accuracy: 0.682
+Best fixed test baseline: fixed:qwen3-4b-awq__tokens-1024
+
+RADAR routing
+strategy | accuracy | average latency
+----------------------------------------------------------------------
+radar-chebyshev:0 | 0.308 | 0.207s
+radar-chebyshev:0.25 | 0.298 | 3.654s
+radar-chebyshev:0.5 | 0.338 | 7.106s
+radar-chebyshev:0.75 | 0.333 | 7.219s
+radar-chebyshev:1 | 0.333 | 7.219s
+
+Hypervolume
+----------------------------------------------------------------------
+Fixed-configuration frontier: 0.347359
+RADAR frontier: 0.330996
+RADAR difference: -0.016363
+Calibrated-classifier frontier: 0.352483
+Calibrated-classifier difference: +0.005124
+Random-Pair frontier: 0.340875
+Random-Pair difference: -0.006484
+
+Proxy CPT (90%)
+----------------------------------------------------------------------
+Reference configuration: qwen3-8b-awq__tokens-1024
+Reference accuracy: 0.383838
+Reference raw cost (output-tokens): 1025.508000
+RADAR: unreachable
+Calibrated classifier: 0.2993 (29.93%)
+Random-Pair: 0.5025 (50.25%)
+
+Area under the risk-coverage curve
+----------------------------------------------------------------------
+fixed:qwen3-4b-awq__tokens-0: 0.647152
+fixed:qwen3-4b-awq__tokens-1024: 0.495806
+fixed:qwen3-4b-awq__tokens-256: 0.598722
+fixed:qwen3-8b-awq__tokens-0: 0.591979
+fixed:qwen3-8b-awq__tokens-1024: 0.541449
+fixed:qwen3-8b-awq__tokens-256: 0.594358
+routing-sampling:0: 0.618532
+routing-sampling:1: 0.616190
+routing-sampling:2: 0.550260
+routing-sampling:3: 0.566173
+routing-sampling:4: 0.547037
+routing-sampling:5: 0.578192
+routing-sampling:6: 0.511346
+routing-sampling:7: 0.615441
+routing-sampling:8: 0.571058
+routing-sampling:9: 0.593344
+radar-chebyshev:0: 0.647152
+radar-chebyshev:0.25: 0.644616
+radar-chebyshev:0.5: 0.584680
+radar-chebyshev:0.75: 0.606741
+radar-chebyshev:1: 0.606741
+calibrated-classifier-chebyshev:0: 0.660788
+calibrated-classifier-chebyshev:0.25: 0.589727
+calibrated-classifier-chebyshev:0.5: 0.556153
+calibrated-classifier-chebyshev:0.75: 0.534413
+calibrated-classifier-chebyshev:1: 0.534413
+
+Routing diagnostics
+----------------------------------------------------------------------
+
+radar-chebyshev:0
+Compared with: fixed:qwen3-4b-awq__tokens-1024
+Selections: qwen3-4b-awq__tokens-0=198
+Improved (12): gpqa::rec0wZvZgiz320KRs, gpqa::rec7C06XOB2h298ue, gpqa::recDytVnNYZe2HuUU, gpqa::recE2ihVfqEK4R9d0, gpqa::recFaL6j8UMhutXrc, gpqa::recgC4GJ8wUemlUQD, gpqa::rechtUKxC6G67H7Pr, gpqa::recmkvk6EFAmqyMxR, gpqa::recqFDvYKKRmbnoUb, gpqa::recvZlMbpPz0yLDle, gpqa::recyPffUDqC2k7ZZO, gpqa::reczkBiPPNrNN49Hp
+Regressed (34): gpqa::rec260hNUCEj109Dj, gpqa::rec2UlKqC6RFHdcro, gpqa::rec4JrWy7Il8ho5vk, gpqa::rec4L69T0Y1AS4AFS, gpqa::rec7qmSnbud4FHSqL, gpqa::recAAJoHMW45Lv5je, gpqa::recBXlqrZUCR897It, gpqa::recHVUd2DkoKfedJZ, gpqa::recI1ls9OXdxatHQn, gpqa::recINGR1z01Fh1Z3A, gpqa::recKm6LNWykGapmCr, gpqa::recLAgwx9vbgB5EHk, gpqa::recLrRirj7iXoB0rU, gpqa::recN4DY9Q5V03glmQ, gpqa::recOYsaYs6RmtlTDy, gpqa::recTs7qzfJs6kfLUK, gpqa::recUc29lMDBEvurYo, gpqa::recWzUUYBN0NuXO2k, gpqa::recXsuOHRBLcyenF2, gpqa::recZt4x514UQNnsgy, gpqa::recafnH3RRnMBXEb1, gpqa::recb2M22zaD3tL6Qc, gpqa::reccVBrYdwsB84fGy, gpqa::recclFbsjbaiVVnnV, gpqa::reckYqR92oJkqJXkE, gpqa::reckl6PkaEMWM50yZ, gpqa::recmwwQJnx7ll7bqL, gpqa::recpki12iG9RUGrz9, gpqa::recqLRu4BcJvlSANc, gpqa::rectlyG9pCAAuWhoB, gpqa::recuYEkVjdVUwA3c0, gpqa::recvlnu8BuLmXZhSX, gpqa::recw4rROcnHKNZhtK, gpqa::reczjcMtrB1YGS2fO
+Both correct: 49
+Both incorrect: 103
+
+radar-chebyshev:0.25
+Compared with: fixed:qwen3-4b-awq__tokens-1024
+Selections: qwen3-4b-awq__tokens-0=42, qwen3-8b-awq__tokens-0=68, qwen3-8b-awq__tokens-256=88
+Improved (20): gpqa::rec32C1ZEapBnCC0E, gpqa::rec7C06XOB2h298ue, gpqa::recE2ihVfqEK4R9d0, gpqa::recLB0EkQ54bYVhnd, gpqa::recNAiPUKOulQbKVP, gpqa::recPIzpnuYpB4yvmp, gpqa::recRTiyaRymerDJ4y, gpqa::recV1nqYQvpII94oC, gpqa::recXsYa3i2UhGF5fe, gpqa::recYt8xx80OTyDsL0, gpqa::reca44yABeO2fx7UB, gpqa::recatj4YXzbOaq3Ar, gpqa::reccVFW11Elovnf8T, gpqa::recgM7o1tcc7tP778, gpqa::rechtUKxC6G67H7Pr, gpqa::recmkvk6EFAmqyMxR, gpqa::recnawZPumSCLMVgp, gpqa::recqFDvYKKRmbnoUb, gpqa::recvZlMbpPz0yLDle, gpqa::reczkBiPPNrNN49Hp
+Regressed (44): gpqa::rec06pnAkLOr2t2mp, gpqa::rec260hNUCEj109Dj, gpqa::rec4L69T0Y1AS4AFS, gpqa::rec4r4KWNLrT7g2kR, gpqa::rec7qmSnbud4FHSqL, gpqa::recAAJoHMW45Lv5je, gpqa::recBXlqrZUCR897It, gpqa::recEmTBhx2hgw6tPQ, gpqa::recHVUd2DkoKfedJZ, gpqa::recINGR1z01Fh1Z3A, gpqa::recJJcOHhFeSaRpl4, gpqa::recKm6LNWykGapmCr, gpqa::recKv4hFyNpViUXnL, gpqa::recLAgwx9vbgB5EHk, gpqa::recLrRirj7iXoB0rU, gpqa::recN4DY9Q5V03glmQ, gpqa::recNuT2oSnO86bxOx, gpqa::recOYsaYs6RmtlTDy, gpqa::recTs7qzfJs6kfLUK, gpqa::recUc29lMDBEvurYo, gpqa::recWzUUYBN0NuXO2k, gpqa::recXsuOHRBLcyenF2, gpqa::recZ13cwgDQf9jRd9, gpqa::recafnH3RRnMBXEb1, gpqa::recclFbsjbaiVVnnV, gpqa::recgI6tUQ7RLJRWGx, gpqa::reciuppdQde4FGX1z, gpqa::recjgMJaMxz4ESDF2, gpqa::reckEnrOPFT9Ru7tW, gpqa::reckYqR92oJkqJXkE, gpqa::reckl6PkaEMWM50yZ, gpqa::recl1UtgTVKishAq4, gpqa::recmI7EiLv72PxmYK, gpqa::recpki12iG9RUGrz9, gpqa::recqLRu4BcJvlSANc, gpqa::recr3VHM4zYf6dMFY, gpqa::recrHBEJJoDTV05JR, gpqa::recrs0kUo7Ua1xhKO, gpqa::rectlyG9pCAAuWhoB, gpqa::recuYEkVjdVUwA3c0, gpqa::recw4rROcnHKNZhtK, gpqa::recxsX66ktJ1Lwt4f, gpqa::reczUoM8JsxU6pYxr, gpqa::reczjcMtrB1YGS2fO
+Both correct: 39
+Both incorrect: 95
+
+radar-chebyshev:0.5
+Compared with: fixed:qwen3-4b-awq__tokens-1024
+Selections: qwen3-4b-awq__tokens-0=5, qwen3-4b-awq__tokens-256=37, qwen3-8b-awq__tokens-256=156
+Improved (24): gpqa::rec0wZvZgiz320KRs, gpqa::rec32C1ZEapBnCC0E, gpqa::rec6sE2CRtD4drtHg, gpqa::rec7C06XOB2h298ue, gpqa::recE2ihVfqEK4R9d0, gpqa::recLB0EkQ54bYVhnd, gpqa::recNAiPUKOulQbKVP, gpqa::recPIzpnuYpB4yvmp, gpqa::recV1nqYQvpII94oC, gpqa::recVvpD8miVjmmyfe, gpqa::recXsYa3i2UhGF5fe, gpqa::recYt8xx80OTyDsL0, gpqa::reca44yABeO2fx7UB, gpqa::recatj4YXzbOaq3Ar, gpqa::reccVFW11Elovnf8T, gpqa::recfTlTMjZBuOducT, gpqa::recgC4GJ8wUemlUQD, gpqa::recgM7o1tcc7tP778, gpqa::rechtUKxC6G67H7Pr, gpqa::recmkvk6EFAmqyMxR, gpqa::recnawZPumSCLMVgp, gpqa::recqFDvYKKRmbnoUb, gpqa::recvZlMbpPz0yLDle, gpqa::reczkBiPPNrNN49Hp
+Regressed (40): gpqa::rec06pnAkLOr2t2mp, gpqa::rec260hNUCEj109Dj, gpqa::rec4L69T0Y1AS4AFS, gpqa::rec4r4KWNLrT7g2kR, gpqa::rec7qmSnbud4FHSqL, gpqa::recAAJoHMW45Lv5je, gpqa::recBXlqrZUCR897It, gpqa::recEmTBhx2hgw6tPQ, gpqa::recHVUd2DkoKfedJZ, gpqa::recI1ls9OXdxatHQn, gpqa::recIDiDKKrN61Auyr, gpqa::recINGR1z01Fh1Z3A, gpqa::recJJcOHhFeSaRpl4, gpqa::recKv4hFyNpViUXnL, gpqa::recLAgwx9vbgB5EHk, gpqa::recLrRirj7iXoB0rU, gpqa::recN4DY9Q5V03glmQ, gpqa::recNuT2oSnO86bxOx, gpqa::recOYsaYs6RmtlTDy, gpqa::recTs7qzfJs6kfLUK, gpqa::recUc29lMDBEvurYo, gpqa::recWzUUYBN0NuXO2k, gpqa::recXsuOHRBLcyenF2, gpqa::recZ13cwgDQf9jRd9, gpqa::recafnH3RRnMBXEb1, gpqa::recjgMJaMxz4ESDF2, gpqa::reckEnrOPFT9Ru7tW, gpqa::reckYqR92oJkqJXkE, gpqa::reckl6PkaEMWM50yZ, gpqa::recl1UtgTVKishAq4, gpqa::recmI7EiLv72PxmYK, gpqa::recpki12iG9RUGrz9, gpqa::recrHBEJJoDTV05JR, gpqa::recrs0kUo7Ua1xhKO, gpqa::rectlyG9pCAAuWhoB, gpqa::recuYEkVjdVUwA3c0, gpqa::recw4rROcnHKNZhtK, gpqa::recxsX66ktJ1Lwt4f, gpqa::reczUoM8JsxU6pYxr, gpqa::reczjcMtrB1YGS2fO
+Both correct: 43
+Both incorrect: 91
+
+radar-chebyshev:0.75
+Compared with: fixed:qwen3-4b-awq__tokens-1024
+Selections: qwen3-4b-awq__tokens-256=42, qwen3-8b-awq__tokens-256=156
+Improved (24): gpqa::rec0wZvZgiz320KRs, gpqa::rec32C1ZEapBnCC0E, gpqa::rec6sE2CRtD4drtHg, gpqa::rec7C06XOB2h298ue, gpqa::recE2ihVfqEK4R9d0, gpqa::recLB0EkQ54bYVhnd, gpqa::recNAiPUKOulQbKVP, gpqa::recPIzpnuYpB4yvmp, gpqa::recV1nqYQvpII94oC, gpqa::recVvpD8miVjmmyfe, gpqa::recXsYa3i2UhGF5fe, gpqa::recYt8xx80OTyDsL0, gpqa::reca44yABeO2fx7UB, gpqa::recatj4YXzbOaq3Ar, gpqa::reccVFW11Elovnf8T, gpqa::recfTlTMjZBuOducT, gpqa::recgC4GJ8wUemlUQD, gpqa::recgM7o1tcc7tP778, gpqa::rechtUKxC6G67H7Pr, gpqa::recmkvk6EFAmqyMxR, gpqa::recnawZPumSCLMVgp, gpqa::recqFDvYKKRmbnoUb, gpqa::recvZlMbpPz0yLDle, gpqa::reczkBiPPNrNN49Hp
+Regressed (41): gpqa::rec06pnAkLOr2t2mp, gpqa::rec260hNUCEj109Dj, gpqa::rec4L69T0Y1AS4AFS, gpqa::rec4r4KWNLrT7g2kR, gpqa::rec7qmSnbud4FHSqL, gpqa::recAAJoHMW45Lv5je, gpqa::recBXlqrZUCR897It, gpqa::recEmTBhx2hgw6tPQ, gpqa::recHVUd2DkoKfedJZ, gpqa::recI1ls9OXdxatHQn, gpqa::recIDiDKKrN61Auyr, gpqa::recINGR1z01Fh1Z3A, gpqa::recJJcOHhFeSaRpl4, gpqa::recKv4hFyNpViUXnL, gpqa::recLAgwx9vbgB5EHk, gpqa::recLrRirj7iXoB0rU, gpqa::recN4DY9Q5V03glmQ, gpqa::recNuT2oSnO86bxOx, gpqa::recOYsaYs6RmtlTDy, gpqa::recTs7qzfJs6kfLUK, gpqa::recUc29lMDBEvurYo, gpqa::recWzUUYBN0NuXO2k, gpqa::recXsuOHRBLcyenF2, gpqa::recZ13cwgDQf9jRd9, gpqa::recafnH3RRnMBXEb1, gpqa::recjgMJaMxz4ESDF2, gpqa::reckEnrOPFT9Ru7tW, gpqa::reckYqR92oJkqJXkE, gpqa::reckl6PkaEMWM50yZ, gpqa::recl1UtgTVKishAq4, gpqa::recmI7EiLv72PxmYK, gpqa::recoiTJPGUmzAkief, gpqa::recpki12iG9RUGrz9, gpqa::recrHBEJJoDTV05JR, gpqa::recrs0kUo7Ua1xhKO, gpqa::rectlyG9pCAAuWhoB, gpqa::recuYEkVjdVUwA3c0, gpqa::recw4rROcnHKNZhtK, gpqa::recxsX66ktJ1Lwt4f, gpqa::reczUoM8JsxU6pYxr, gpqa::reczjcMtrB1YGS2fO
+Both correct: 42
+Both incorrect: 91
+
+radar-chebyshev:1
+Compared with: fixed:qwen3-4b-awq__tokens-1024
+Selections: qwen3-4b-awq__tokens-256=42, qwen3-8b-awq__tokens-256=156
+Improved (24): gpqa::rec0wZvZgiz320KRs, gpqa::rec32C1ZEapBnCC0E, gpqa::rec6sE2CRtD4drtHg, gpqa::rec7C06XOB2h298ue, gpqa::recE2ihVfqEK4R9d0, gpqa::recLB0EkQ54bYVhnd, gpqa::recNAiPUKOulQbKVP, gpqa::recPIzpnuYpB4yvmp, gpqa::recV1nqYQvpII94oC, gpqa::recVvpD8miVjmmyfe, gpqa::recXsYa3i2UhGF5fe, gpqa::recYt8xx80OTyDsL0, gpqa::reca44yABeO2fx7UB, gpqa::recatj4YXzbOaq3Ar, gpqa::reccVFW11Elovnf8T, gpqa::recfTlTMjZBuOducT, gpqa::recgC4GJ8wUemlUQD, gpqa::recgM7o1tcc7tP778, gpqa::rechtUKxC6G67H7Pr, gpqa::recmkvk6EFAmqyMxR, gpqa::recnawZPumSCLMVgp, gpqa::recqFDvYKKRmbnoUb, gpqa::recvZlMbpPz0yLDle, gpqa::reczkBiPPNrNN49Hp
+Regressed (41): gpqa::rec06pnAkLOr2t2mp, gpqa::rec260hNUCEj109Dj, gpqa::rec4L69T0Y1AS4AFS, gpqa::rec4r4KWNLrT7g2kR, gpqa::rec7qmSnbud4FHSqL, gpqa::recAAJoHMW45Lv5je, gpqa::recBXlqrZUCR897It, gpqa::recEmTBhx2hgw6tPQ, gpqa::recHVUd2DkoKfedJZ, gpqa::recI1ls9OXdxatHQn, gpqa::recIDiDKKrN61Auyr, gpqa::recINGR1z01Fh1Z3A, gpqa::recJJcOHhFeSaRpl4, gpqa::recKv4hFyNpViUXnL, gpqa::recLAgwx9vbgB5EHk, gpqa::recLrRirj7iXoB0rU, gpqa::recN4DY9Q5V03glmQ, gpqa::recNuT2oSnO86bxOx, gpqa::recOYsaYs6RmtlTDy, gpqa::recTs7qzfJs6kfLUK, gpqa::recUc29lMDBEvurYo, gpqa::recWzUUYBN0NuXO2k, gpqa::recXsuOHRBLcyenF2, gpqa::recZ13cwgDQf9jRd9, gpqa::recafnH3RRnMBXEb1, gpqa::recjgMJaMxz4ESDF2, gpqa::reckEnrOPFT9Ru7tW, gpqa::reckYqR92oJkqJXkE, gpqa::reckl6PkaEMWM50yZ, gpqa::recl1UtgTVKishAq4, gpqa::recmI7EiLv72PxmYK, gpqa::recoiTJPGUmzAkief, gpqa::recpki12iG9RUGrz9, gpqa::recrHBEJJoDTV05JR, gpqa::recrs0kUo7Ua1xhKO, gpqa::rectlyG9pCAAuWhoB, gpqa::recuYEkVjdVUwA3c0, gpqa::recw4rROcnHKNZhtK, gpqa::recxsX66ktJ1Lwt4f, gpqa::reczUoM8JsxU6pYxr, gpqa::reczjcMtrB1YGS2fO
+Both correct: 42
+Both incorrect: 91
